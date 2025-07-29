@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
+import { Building, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { Eye, EyeOff, Lock, Mail, Building, Shield } from 'lucide-react'
-import toast from 'react-hot-toast'
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -14,13 +14,6 @@ const Login = () => {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -30,124 +23,113 @@ const Login = () => {
       toast.success('Login successful!')
       navigate('/dashboard')
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Login failed')
+      toast.error(error.message || 'Login failed')
     } finally {
       setLoading(false)
     }
   }
 
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    })
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
         {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mb-6">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full mb-4">
             <Building className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
             Welcome Back
           </h2>
-          <p className="mt-2 text-gray-600">Sign in to your HRMS account</p>
+          <p className="text-slate-600 dark:text-gray-300 mt-2">
+            Sign in to your HRMS account
+          </p>
         </div>
 
         {/* Login Form */}
-        <div className="card glass-effect">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
+        <div className="card p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="form-label">
                 Email Address
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="input-field pl-10"
-                  placeholder="Enter your email"
-                />
-              </div>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                className="input-field"
+                placeholder="Enter your email"
+              />
             </div>
 
-            {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="form-label">
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
                 <input
+                  type={showPassword ? 'text' : 'password'}
                   id="password"
                   name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
                   value={formData.password}
                   onChange={handleChange}
-                  className="input-field pl-10 pr-10"
+                  required
+                  className="input-field pr-10"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                  )}
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full flex items-center justify-center"
+              className="btn-primary w-full"
             >
               {loading ? (
-                <div className="loading-spinner h-5 w-5 mr-2"></div>
+                <div className="flex items-center justify-center">
+                  <div className="loading-spinner h-5 w-5 mr-2"></div>
+                  Signing In...
+                </div>
               ) : (
-                <Lock className="h-5 w-5 mr-2" />
+                'Sign In'
               )}
-              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
-          {/* Sign Up Link */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-slate-600 dark:text-gray-400">
               Don't have an account?{' '}
-              <Link
-                to="/signup"
-                className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+              <Link 
+                to="/signup" 
+                className="text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-medium"
               >
-                Sign up here
+                Sign up
               </Link>
             </p>
           </div>
         </div>
 
         {/* Security Features */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <Shield className="h-4 w-4 text-green-500" />
-              <span>100% Secure</span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <Building className="h-4 w-4 text-blue-500" />
-              <span>Multi-tenant</span>
-            </div>
+        <div className="mt-8 text-center">
+          <div className="flex items-center justify-center text-slate-500 dark:text-gray-400">
+            <Building className="h-4 w-4 mr-2 text-blue-500" />
+            <span className="text-sm">Enterprise-grade security</span>
           </div>
         </div>
       </div>

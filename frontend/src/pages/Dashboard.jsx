@@ -1,200 +1,197 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
 import { 
   Users, 
-  UserCheck, 
-  Calendar, 
   TrendingUp, 
-  Plus, 
-  BarChart3, 
-  Calendar as CalendarIcon,
+  Calendar, 
+  DollarSign,
   Building,
-  Mail,
-  Shield,
-  Clock
+  Clock,
+  FileText,
+  Bell,
+  Plus
 } from 'lucide-react'
 
 const Dashboard = () => {
-  const { user } = useAuth()
-  const [stats, setStats] = useState({
-    totalEmployees: 0,
-    activeEmployees: 0,
-    thisMonth: 0,
-    growthRate: 0
-  })
+  const [currentTime, setCurrentTime] = useState(new Date())
 
   useEffect(() => {
-    // Simulate loading stats
-    setTimeout(() => {
-      setStats({
-        totalEmployees: 24,
-        activeEmployees: 22,
-        thisMonth: 3,
-        growthRate: 12.5
-      })
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
     }, 1000)
+    return () => clearInterval(timer)
   }, [])
+
+  const stats = [
+    {
+      name: 'Total Employees',
+      value: '0',
+      change: '0%',
+      changeType: 'neutral',
+      icon: Users,
+      color: 'from-blue-600 to-blue-700'
+    },
+    {
+      name: 'Active Projects',
+      value: '0',
+      change: '0%',
+      changeType: 'neutral',
+      icon: TrendingUp,
+      color: 'from-emerald-600 to-emerald-700'
+    },
+    {
+      name: 'Leave Requests',
+      value: '0',
+      change: '0%',
+      changeType: 'neutral',
+      icon: Calendar,
+      color: 'from-amber-600 to-amber-700'
+    },
+    {
+      name: 'Total Payroll',
+      value: '$0',
+      change: '0%',
+      changeType: 'neutral',
+      icon: DollarSign,
+      color: 'from-cyan-600 to-cyan-700'
+    }
+  ]
 
   const quickActions = [
     {
-      title: 'Add Employee',
-      description: 'Add a new employee to the system',
-      icon: Plus,
-      color: 'from-blue-500 to-blue-600',
+      name: 'Add Employee',
+      description: 'Create new employee profile',
+      icon: Users,
+      color: 'from-blue-600 to-blue-700',
       href: '/employees'
     },
     {
-      title: 'View Reports',
-      description: 'Generate and view reports',
-      icon: BarChart3,
-      color: 'from-purple-500 to-purple-600',
+      name: 'View Reports',
+      description: 'Generate HR reports',
+      icon: FileText,
+      color: 'from-emerald-600 to-emerald-700',
       href: '/reports'
     },
     {
-      title: 'Schedule Meeting',
-      description: 'Schedule team meetings',
-      icon: CalendarIcon,
-      color: 'from-emerald-500 to-emerald-600',
-      href: '/meetings'
+      name: 'Manage Leave',
+      description: 'Process leave requests',
+      icon: Calendar,
+      color: 'from-amber-600 to-amber-700',
+      href: '/leave'
     }
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-block bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2 rounded-full mb-4 shadow-lg">
-          <strong className="text-sm font-semibold">HR DASHBOARD</strong>
-        </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">
-          Welcome Back, {user?.full_name}!
-        </h1>
-        <p className="text-gray-600 text-lg">
-          Here's what's happening with your team today
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white">
+        <h1 className="text-2xl font-bold dark:text-white">HR DASHBOARD</h1>
+        <p className="text-blue-100 dark:text-gray-300">
+          Welcome to your HR Management System
         </p>
-        {/* Debug Info */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm text-blue-800">
-            <strong>Debug Info:</strong> User Role: {user?.role || 'undefined'} | 
-            User ID: {user?.id || 'undefined'}
-          </p>
-        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="stats-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Employees</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalEmployees}</p>
-              <p className="text-sm text-emerald-600 font-medium">+12% from last month</p>
-            </div>
-            <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <Users className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="stats-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Employees</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.activeEmployees}</p>
-              <p className="text-sm text-emerald-600 font-medium">+5% from last month</p>
-            </div>
-            <div className="h-12 w-12 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-              <UserCheck className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="stats-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">This Month</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.thisMonth}</p>
-              <p className="text-sm text-emerald-600 font-medium">+8% from last month</p>
-            </div>
-            <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Calendar className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="stats-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Growth Rate</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.growthRate}%</p>
-              <p className="text-sm text-emerald-600 font-medium">+2% from last month</p>
-            </div>
-            <div className="h-12 w-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
+      {/* Debug Info */}
+      <div className="bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-lg p-4">
+        <p className="text-blue-700 dark:text-blue-300 text-sm">
+          <strong>Debug Info:</strong> Current time: {currentTime.toLocaleTimeString()} | 
+          User role: HR Manager | Session active
+        </p>
       </div>
 
-      {/* Company Information */}
-      <div className="card">
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">Company Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Building className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Company Name</p>
-                  <p className="text-gray-900">Your Company</p>
-                </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {stats.map((stat) => (
+          <div key={stat.name} className="stats-card card-hover">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-black dark:text-gray-400">
+                  {stat.name}
+                </p>
+                <p className="text-2xl font-bold text-black dark:text-white">
+                  {stat.value}
+                </p>
+                <p className={`text-sm ${
+                  stat.changeType === 'positive' 
+                    ? 'text-emerald-600 dark:text-emerald-400' 
+                    : stat.changeType === 'negative'
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : 'text-gray-500 dark:text-gray-400'
+                }`}>
+                  {stat.change} from last month
+                </p>
               </div>
-              <div className="flex items-center space-x-3">
-                <Mail className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Email</p>
-                  <p className="text-gray-900">{user?.email}</p>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Shield className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Your Role</p>
-                  <p className="text-gray-900 capitalize">{user?.role}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Clock className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Member Since</p>
-                  <p className="text-gray-900">N/A</p>
-                </div>
+              <div className={`p-3 rounded-lg bg-gradient-to-r ${stat.color}`}>
+                <stat.icon className="h-6 w-6 text-white" />
               </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {/* Quick Actions */}
-      <div className="card">
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {quickActions.map((action, index) => (
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Company Information */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
+            Company Information
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center text-black dark:text-gray-400">
+              <Building className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
+              <span>Your Company Name</span>
+            </div>
+            <div className="flex items-center text-black dark:text-gray-400">
+              <Clock className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
+              <span>Established: [Year]</span>
+            </div>
+            <div className="flex items-center text-black dark:text-gray-400">
+              <Users className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
+              <span>0 Employees</span>
+            </div>
+            <div className="flex items-center text-black dark:text-gray-400">
+              <DollarSign className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
+              <span>Annual Revenue: $0</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
+            Quick Actions
+          </h3>
+          <div className="space-y-3">
+            {quickActions.map((action) => (
               <button
-                key={index}
-                className="group relative p-6 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-lg transition-all duration-200 text-left"
+                key={action.name}
+                className="w-full flex items-center p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors"
               >
-                <div className={`h-12 w-12 bg-gradient-to-r ${action.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200`}>
-                  <action.icon className="h-6 w-6 text-white" />
+                <div className={`p-2 rounded-lg bg-gradient-to-r ${action.color} mr-3`}>
+                  <action.icon className="h-5 w-5 text-white" />
                 </div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-2">{action.title}</h4>
-                <p className="text-gray-600">{action.description}</p>
+                <div className="text-left">
+                  <p className="font-medium text-black dark:text-white">
+                    {action.name}
+                  </p>
+                  <p className="text-sm text-black dark:text-gray-400">
+                    {action.description}
+                  </p>
+                </div>
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
+          Recent Activity
+        </h3>
+        <div className="text-center py-8">
+          <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-black dark:text-gray-400">No recent activity</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Activities will appear here once you start using the system</p>
         </div>
       </div>
     </div>

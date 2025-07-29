@@ -1,19 +1,42 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
+import { Building, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { Eye, EyeOff, Mail, Lock, User, Building } from 'lucide-react'
 
 const Signup = () => {
   const [formData, setFormData] = useState({
+    full_name: '',
     email: '',
     password: '',
-    full_name: '',
-    company_name: ''
+    confirmPassword: ''
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const { signup } = useAuth()
   const navigate = useNavigate()
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      await signup(formData.full_name, formData.email, formData.password)
+      toast.success('Account created successfully!')
+      navigate('/dashboard')
+    } catch (error) {
+      toast.error(error.message || 'Signup failed')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleChange = (e) => {
     setFormData({
@@ -22,145 +45,143 @@ const Signup = () => {
     })
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    
-    const success = await signup(formData)
-    if (success) {
-      navigate('/login')
-    }
-    setLoading(false)
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your HR account
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full mb-4">
+            <Building className="h-8 w-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+            Create Account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-              sign in to your account
-            </Link>
+          <p className="text-slate-600 dark:text-gray-300 mt-2">
+            Join our HRMS platform
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
+
+        {/* Signup Form */}
+        <div className="card p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="full_name" className="form-label">
                 Full Name
               </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="full_name"
-                  name="full_name"
-                  type="text"
-                  required
-                  value={formData.full_name}
-                  onChange={handleChange}
-                  className="input-field pl-10"
-                  placeholder="Enter your full name"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label htmlFor="company_name" className="block text-sm font-medium text-gray-700">
-                Company Name
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="company_name"
-                  name="company_name"
-                  type="text"
-                  required
-                  value={formData.company_name}
-                  onChange={handleChange}
-                  className="input-field pl-10"
-                  placeholder="Enter your company name"
-                />
-              </div>
+              <input
+                type="text"
+                id="full_name"
+                name="full_name"
+                value={formData.full_name}
+                onChange={handleChange}
+                required
+                className="input-field"
+                placeholder="Enter your full name"
+              />
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
+              <label htmlFor="email" className="form-label">
+                Email Address
               </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="input-field pl-10"
-                  placeholder="Enter your email"
-                />
-              </div>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                className="input-field"
+                placeholder="Enter your email"
+              />
             </div>
-            
+
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="form-label">
                 Password
               </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
+              <div className="relative">
                 <input
+                  type={showPassword ? 'text' : 'password'}
                   id="password"
                   name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
                   value={formData.password}
                   onChange={handleChange}
-                  className="input-field pl-10 pr-10"
-                  placeholder="Enter your password"
+                  required
+                  className="input-field pr-10"
+                  placeholder="Create a password"
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
-          </div>
 
-          <div>
+            <div>
+              <label htmlFor="confirmPassword" className="form-label">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  className="input-field pr-10"
+                  placeholder="Confirm your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full flex justify-center"
+              className="btn-primary w-full"
             >
               {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="flex items-center justify-center">
+                  <div className="loading-spinner h-5 w-5 mr-2"></div>
+                  Creating Account...
+                </div>
               ) : (
                 'Create Account'
               )}
             </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-slate-600 dark:text-gray-400">
+              Already have an account?{' '}
+              <Link 
+                to="/login" 
+                className="text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-medium"
+              >
+                Sign in
+              </Link>
+            </p>
           </div>
-        </form>
+        </div>
+
+        {/* Security Features */}
+        <div className="mt-8 text-center">
+          <div className="flex items-center justify-center text-slate-500 dark:text-gray-400">
+            <Building className="h-4 w-4 mr-2 text-blue-500" />
+            <span className="text-sm">Enterprise-grade security</span>
+          </div>
+        </div>
       </div>
     </div>
   )

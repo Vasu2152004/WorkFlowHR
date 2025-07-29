@@ -1,104 +1,103 @@
-import { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { 
-  Home, 
-  Users, 
-  User, 
-  Settings, 
   Menu, 
   X, 
-  LogOut,
-  Bell,
-  Search,
-  Target,
-  Clock,
-  Calendar,
-  FileText,
-  ChevronDown
+  Search, 
+  Bell, 
+  User, 
+  LogOut, 
+  Settings,
+  Sun,
+  Moon
 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true'
+    setDarkMode(savedDarkMode)
+    if (savedDarkMode) {
+      document.documentElement.classList.add('dark')
+    }
+  }, [])
+
+  const toggleDarkMode = () => {
+    const newDarkMode = !darkMode
+    setDarkMode(newDarkMode)
+    localStorage.setItem('darkMode', newDarkMode.toString())
+    if (newDarkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
 
   const handleLogout = () => {
     logout()
+    navigate('/login')
   }
 
-  // Different navigation based on user role
-  const navigation = user?.role === 'employee' ? [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'My Tasks', href: '/tasks', icon: Target },
-    { name: 'Attendance', href: '/attendance', icon: Clock },
-    { name: 'Leave Requests', href: '/leave', icon: Calendar },
-    { name: 'Documents', href: '/documents', icon: FileText },
-    { name: 'Notifications', href: '/notifications', icon: Bell },
-    { name: 'My Profile', href: '/profile', icon: User },
-  ] : [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Employees', href: '/employees', icon: Users },
-    { name: 'Profile', href: '/profile', icon: User },
-    { name: 'Settings', href: '/settings', icon: Settings }
+  const navigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: '📊' },
+    { name: 'Employees', href: '/employees', icon: '👥' },
+    { name: 'Profile', href: '/profile', icon: '👤' },
   ]
 
-  // Different sidebar styling for employees
-  const isEmployee = user?.role === 'employee'
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className={`fixed inset-y-0 left-0 flex w-64 flex-col ${isEmployee ? 'bg-gradient-to-b from-indigo-900 via-purple-900 to-indigo-900' : 'sidebar'}`}>
-          {/* Mobile sidebar header */}
-          <div className="flex h-16 items-center justify-between px-6 border-b border-gray-700">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-xl font-bold text-white">HRMS</h1>
-              </div>
-            </div>
+        <div className="fixed inset-0 bg-slate-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+        <div className="relative flex w-full max-w-xs flex-1 flex-col bg-gradient-to-b from-slate-900 via-blue-900 to-indigo-900">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-blue-700 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-white">HRMS</h2>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="text-gray-300 hover:text-white"
+              className="text-blue-100 hover:text-white"
             >
-              <X className="h-6 w-6" />
+              <X size={24} />
             </button>
           </div>
-
-          {/* Mobile sidebar navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation.map((item) => (
-              <a
+              <Link
                 key={item.name}
-                href={item.href}
-                className="sidebar-item"
+                to={item.href}
+                className="sidebar-item font-bold text-black"
+                onClick={() => setSidebarOpen(false)}
               >
-                <item.icon className="mr-3 h-5 w-5" />
+                <span className="mr-3">{item.icon}</span>
                 {item.name}
-              </a>
+              </Link>
             ))}
           </nav>
-
-          {/* Mobile sidebar footer */}
-          <div className="border-t border-gray-700 p-4">
-            <div className="flex items-center px-4 py-2">
+          <div className="border-t border-blue-700 dark:border-gray-700 px-4 py-4">
+            <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-white">
-                    {user?.full_name?.charAt(0) || 'U'}
-                  </span>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center">
+                  <User size={16} className="text-white" />
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-white">{user?.full_name}</p>
-                <p className="text-xs text-gray-300 capitalize">{user?.role}</p>
+                <p className="text-sm font-bold text-black">
+                  {user?.full_name || 'User'}
+                </p>
+                <p className="text-xs font-semibold text-black capitalize">
+                  {user?.role || 'user'}
+                </p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="mt-4 w-full flex items-center px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              className="mt-3 w-full flex items-center px-3 py-2 text-black hover:text-black hover:bg-blue-800 font-semibold rounded-lg transition-colors"
             >
-              <LogOut className="mr-3 h-5 w-5" />
+              <LogOut size={16} className="mr-2" />
               Logout
             </button>
           </div>
@@ -106,51 +105,44 @@ const Layout = ({ children }) => {
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className={`flex flex-col ${isEmployee ? 'bg-gradient-to-b from-indigo-900 via-purple-900 to-indigo-900' : 'sidebar'}`}>
-          {/* Desktop sidebar header */}
-          <div className="flex h-16 items-center px-6 border-b border-gray-700">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-xl font-bold text-white">HRMS</h1>
-              </div>
-            </div>
+      <div className="hidden lg:flex lg:w-64 lg:flex-col">
+        <div className="flex flex-col flex-grow sidebar">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-blue-700 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-white">HRMS</h2>
           </div>
-
-          {/* Desktop sidebar navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation.map((item) => (
-              <a
+              <Link
                 key={item.name}
-                href={item.href}
-                className="sidebar-item"
+                to={item.href}
+                className="sidebar-item font-bold text-black"
               >
-                <item.icon className="mr-3 h-5 w-5" />
+                <span className="mr-3">{item.icon}</span>
                 {item.name}
-              </a>
+              </Link>
             ))}
           </nav>
-
-          {/* Desktop sidebar footer */}
-          <div className="border-t border-gray-700 p-4">
-            <div className="flex items-center px-4 py-2">
+          <div className="border-t border-blue-700 dark:border-gray-700 px-4 py-4">
+            <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-white">
-                    {user?.full_name?.charAt(0) || 'U'}
-                  </span>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center">
+                  <User size={16} className="text-white" />
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-white">{user?.full_name}</p>
-                <p className="text-xs text-gray-300 capitalize">{user?.role}</p>
+                <p className="text-sm font-bold text-black">
+                  {user?.full_name || 'User'}
+                </p>
+                <p className="text-xs font-semibold text-black capitalize">
+                  {user?.role || 'user'}
+                </p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="mt-4 w-full flex items-center px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              className="mt-3 w-full flex items-center px-3 py-2 text-black hover:text-black hover:bg-blue-800 font-semibold rounded-lg transition-colors"
             >
-              <LogOut className="mr-3 h-5 w-5" />
+              <LogOut size={16} className="mr-2" />
               Logout
             </button>
           </div>
@@ -158,65 +150,65 @@ const Layout = ({ children }) => {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="flex flex-col flex-1 overflow-hidden">
         {/* Top bar */}
-        <div className="header">
-          <div className="header-content">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-                >
-                  <Menu className="h-6 w-6" />
-                </button>
-                <div className="ml-4 lg:ml-0">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Welcome, {user?.full_name}
-                  </h2>
-                  <p className="text-sm text-gray-500 capitalize">
-                    {user?.role} Dashboard
-                  </p>
-                </div>
+        <header className="header">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="ml-4 lg:ml-0">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  {navigation.find(item => window.location.pathname === item.href)?.name || 'Dashboard'}
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-gray-400">
+                  Welcome back, {user?.full_name || 'User'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+              >
+                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+
+              {/* Search */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-64 px-4 py-2 pl-10 text-sm border border-slate-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
+                />
+                <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               </div>
 
-              <div className="flex items-center space-x-4">
-                {/* Search */}
-                <div className="hidden md:flex items-center">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search..."
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
-                    />
+              {/* Notifications */}
+              <button className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">
+                <Bell size={20} />
+              </button>
+
+              {/* User menu */}
+              <div className="relative">
+                <button className="flex items-center space-x-2 p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center">
+                    <User size={16} className="text-white" />
                   </div>
-                </div>
-
-                {/* Notifications */}
-                <button className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg relative">
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
                 </button>
-
-                {/* User menu */}
-                <div className="relative">
-                  <button className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg">
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">
-                        {user?.full_name?.charAt(0) || 'U'}
-                      </span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-gray-400" />
-                  </button>
-                </div>
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
         {/* Page content */}
-        <main className="content-wrapper">
+        <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
       </div>
