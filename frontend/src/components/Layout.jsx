@@ -9,7 +9,9 @@ import {
   LogOut, 
   Settings,
   Sun,
-  Moon
+  Moon,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -17,6 +19,7 @@ const Layout = ({ children }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
@@ -110,10 +113,23 @@ const Layout = ({ children }) => {
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow sidebar">
+      <div className={`hidden lg:flex lg:flex-col transition-all duration-300 ${
+        sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
+      }`}>
+        <div className="flex flex-col flex-grow sidebar relative">
           <div className="flex items-center justify-between px-6 py-4 border-b border-blue-700 dark:border-gray-700">
-            <h2 className="text-xl font-bold text-white">HRMS</h2>
+            <h2 className={`text-xl font-bold text-white transition-opacity duration-300 ${
+              sidebarCollapsed ? 'opacity-0' : 'opacity-100'
+            }`}>
+              HRMS
+            </h2>
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-1 rounded-lg text-white hover:bg-blue-800 transition-colors"
+              title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            >
+              {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
           </div>
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation
@@ -122,10 +138,20 @@ const Layout = ({ children }) => {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className="sidebar-item font-bold text-black"
+                  className="sidebar-item font-bold text-black group relative"
+                  title={sidebarCollapsed ? item.name : ''}
                 >
                   <span className="mr-3">{item.icon}</span>
-                  {item.name}
+                  <span className={`transition-opacity duration-300 ${
+                    sidebarCollapsed ? 'opacity-0' : 'opacity-100'
+                  }`}>
+                    {item.name}
+                  </span>
+                  {sidebarCollapsed && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                      {item.name}
+                    </div>
+                  )}
                 </Link>
               ))}
           </nav>
@@ -136,7 +162,9 @@ const Layout = ({ children }) => {
                   <User size={16} className="text-white" />
                 </div>
               </div>
-              <div className="ml-3">
+              <div className={`ml-3 transition-opacity duration-300 ${
+                sidebarCollapsed ? 'opacity-0' : 'opacity-100'
+              }`}>
                 <p className="text-sm font-bold text-black">
                   {user?.full_name || 'User'}
                 </p>
@@ -147,10 +175,17 @@ const Layout = ({ children }) => {
             </div>
             <button
               onClick={handleLogout}
-              className="mt-3 w-full flex items-center px-3 py-2 text-black hover:text-black hover:bg-blue-800 font-semibold rounded-lg transition-colors"
+              className={`mt-3 w-full flex items-center px-3 py-2 text-black hover:text-black hover:bg-blue-800 font-semibold rounded-lg transition-colors ${
+                sidebarCollapsed ? 'justify-center' : ''
+              }`}
+              title={sidebarCollapsed ? 'Logout' : ''}
             >
-              <LogOut size={16} className="mr-2" />
-              Logout
+              <LogOut size={16} className={sidebarCollapsed ? '' : 'mr-2'} />
+              <span className={`transition-opacity duration-300 ${
+                sidebarCollapsed ? 'opacity-0' : 'opacity-100'
+              }`}>
+                Logout
+              </span>
             </button>
           </div>
         </div>
@@ -167,6 +202,13 @@ const Layout = ({ children }) => {
                 className="lg:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <Menu size={20} />
+              </button>
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="hidden lg:flex p-2 rounded-md text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              >
+                {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
               </button>
               <div className="ml-4 lg:ml-0">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
@@ -219,6 +261,15 @@ const Layout = ({ children }) => {
           {children}
         </main>
       </div>
+
+      {/* Floating toggle button for mobile */}
+      <button
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        className="fixed bottom-6 right-6 lg:hidden z-40 p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+        title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+      >
+        {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+      </button>
     </div>
   )
 }

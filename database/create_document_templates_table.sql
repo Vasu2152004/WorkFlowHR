@@ -1,6 +1,7 @@
--- Document Templates Schema
--- This table stores document templates created by HR
+-- Create document_templates table with all required columns
+-- This script creates the complete table structure
 
+-- Create the document_templates table
 CREATE TABLE IF NOT EXISTS document_templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,

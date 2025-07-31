@@ -10,7 +10,27 @@ import {
   Trash2,
   ArrowLeft,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  Download,
+  Settings,
+  Palette,
+  Type,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Quote,
+  Link,
+  Image,
+  Table,
+  Code,
+  Undo,
+  Redo
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
@@ -28,10 +48,75 @@ const CreateTemplate = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showThemes, setShowThemes] = useState(false)
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+  const [templateSettings, setTemplateSettings] = useState({
+    fontSize: '14px',
+    fontFamily: 'Arial',
+    lineHeight: '1.6',
+    pageMargins: '1in',
+    headerEnabled: false,
+    footerEnabled: false,
+    watermark: '',
+    pageNumbers: false
+  })
 
   const handleInsertPlaceholder = (placeholder) => {
     const placeholderText = `{{${placeholder}}}`
     // This will be handled by the RichTextEditor component
+  }
+
+  const handleCopyTemplate = () => {
+    const templateData = {
+      document_name: documentName,
+      field_tags: fieldTags,
+      content: content,
+      settings: templateSettings
+    }
+    
+    navigator.clipboard.writeText(JSON.stringify(templateData, null, 2))
+    toast.success('Template copied to clipboard!')
+  }
+
+  const handleExportTemplate = () => {
+    const templateData = {
+      document_name: documentName,
+      field_tags: fieldTags,
+      content: content,
+      settings: templateSettings,
+      export_date: new Date().toISOString()
+    }
+    
+    const blob = new Blob([JSON.stringify(templateData, null, 2)], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${documentName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_template.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    toast.success('Template exported successfully!')
+  }
+
+  const handleImportTemplate = (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const templateData = JSON.parse(e.target.result)
+        setDocumentName(templateData.document_name || '')
+        setFieldTags(templateData.field_tags || [{ tag: '', label: '' }])
+        setContent(templateData.content || '<p>Start writing your document here...</p>')
+        setTemplateSettings(templateData.settings || templateSettings)
+        toast.success('Template imported successfully!')
+      } catch (error) {
+        toast.error('Invalid template file format')
+      }
+    }
+    reader.readAsText(file)
   }
 
   const addField = () => {
@@ -117,7 +202,8 @@ const CreateTemplate = () => {
         body: JSON.stringify({
           document_name: documentName.trim(),
           field_tags: fieldTags,
-          content: content
+          content: content,
+          settings: templateSettings
         })
       })
 
@@ -344,6 +430,170 @@ const CreateTemplate = () => {
             )}
           </div>
 
+          {/* Advanced Settings */}
+          <div className="card p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Advanced Settings</h3>
+              <button
+                onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                className="btn-secondary flex items-center"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                {showAdvancedSettings ? 'Hide Settings' : 'Show Settings'}
+              </button>
+            </div>
+
+            {showAdvancedSettings && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Font Family
+                    </label>
+                    <select
+                      value={templateSettings.fontFamily}
+                      onChange={(e) => setTemplateSettings(prev => ({ ...prev, fontFamily: e.target.value }))}
+                      className="input-field"
+                    >
+                      <option value="Arial">Arial</option>
+                      <option value="Times New Roman">Times New Roman</option>
+                      <option value="Calibri">Calibri</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Verdana">Verdana</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Font Size
+                    </label>
+                    <select
+                      value={templateSettings.fontSize}
+                      onChange={(e) => setTemplateSettings(prev => ({ ...prev, fontSize: e.target.value }))}
+                      className="input-field"
+                    >
+                      <option value="12px">12px</option>
+                      <option value="14px">14px</option>
+                      <option value="16px">16px</option>
+                      <option value="18px">18px</option>
+                      <option value="20px">20px</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Line Height
+                    </label>
+                    <select
+                      value={templateSettings.lineHeight}
+                      onChange={(e) => setTemplateSettings(prev => ({ ...prev, lineHeight: e.target.value }))}
+                      className="input-field"
+                    >
+                      <option value="1.2">1.2</option>
+                      <option value="1.4">1.4</option>
+                      <option value="1.6">1.6</option>
+                      <option value="1.8">1.8</option>
+                      <option value="2.0">2.0</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Page Margins
+                    </label>
+                    <select
+                      value={templateSettings.pageMargins}
+                      onChange={(e) => setTemplateSettings(prev => ({ ...prev, pageMargins: e.target.value }))}
+                      className="input-field"
+                    >
+                      <option value="0.5in">0.5 inch</option>
+                      <option value="0.75in">0.75 inch</option>
+                      <option value="1in">1 inch</option>
+                      <option value="1.25in">1.25 inch</option>
+                      <option value="1.5in">1.5 inch</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={templateSettings.headerEnabled}
+                        onChange={(e) => setTemplateSettings(prev => ({ ...prev, headerEnabled: e.target.checked }))}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Enable Header</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={templateSettings.footerEnabled}
+                        onChange={(e) => setTemplateSettings(prev => ({ ...prev, footerEnabled: e.target.checked }))}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Enable Footer</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={templateSettings.pageNumbers}
+                        onChange={(e) => setTemplateSettings(prev => ({ ...prev, pageNumbers: e.target.checked }))}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Page Numbers</span>
+                    </label>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Watermark Text (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={templateSettings.watermark}
+                      onChange={(e) => setTemplateSettings(prev => ({ ...prev, watermark: e.target.value }))}
+                      className="input-field"
+                      placeholder="Enter watermark text"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Template Actions */}
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Template Actions</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <button
+                onClick={handleCopyTemplate}
+                className="btn-secondary flex items-center justify-center"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy Template
+              </button>
+              
+              <button
+                onClick={handleExportTemplate}
+                className="btn-secondary flex items-center justify-center"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Template
+              </button>
+              
+              <label className="btn-secondary flex items-center justify-center cursor-pointer">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportTemplate}
+                  className="hidden"
+                />
+                <FileText className="h-4 w-4 mr-2" />
+                Import Template
+              </label>
+            </div>
+          </div>
+
           {/* Submit Button */}
           <div className="card p-6">
             {error && (
@@ -385,10 +635,13 @@ const CreateTemplate = () => {
             <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
               <p>1. <strong>Name your document</strong> - Give it a descriptive name</p>
               <p>2. <strong>Add custom fields</strong> - Enter field names (tags are auto-generated)</p>
-              <p>3. <strong>Write your content</strong> - Use the rich text editor to create your document</p>
-              <p>4. <strong>Insert placeholders</strong> - Use the dropdown to add placeholders where you want dynamic content</p>
-              <p>5. <strong>Preview</strong> - Switch to preview mode to see how it looks with sample data</p>
-              <p>6. <strong>Save</strong> - Create your template for future use</p>
+              <p>3. <strong>Choose a theme</strong> - Select from predefined professional templates</p>
+              <p>4. <strong>Write your content</strong> - Use the rich text editor to create your document</p>
+              <p>5. <strong>Insert placeholders</strong> - Use the dropdown to add placeholders where you want dynamic content</p>
+              <p>6. <strong>Configure settings</strong> - Set font, margins, and other formatting options</p>
+              <p>7. <strong>Preview</strong> - Switch to preview mode to see how it looks with sample data</p>
+              <p>8. <strong>Export/Import</strong> - Share templates with other HR users</p>
+              <p>9. <strong>Save</strong> - Create your template for future use</p>
             </div>
           </div>
 
@@ -400,6 +653,9 @@ const CreateTemplate = () => {
               <li>• Test your template with preview mode</li>
               <li>• Use formatting to make your documents look professional</li>
               <li>• Choose from pre-built themes for common HR documents</li>
+              <li>• Export templates to share with other HR users</li>
+              <li>• Use advanced settings for custom formatting</li>
+              <li>• Collapse sidebar for more screen space</li>
             </ul>
           </div>
         </div>

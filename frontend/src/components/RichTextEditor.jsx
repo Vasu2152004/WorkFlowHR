@@ -34,7 +34,7 @@ const RichTextEditor = ({ content, onContentChange, fieldTags, onInsertPlacehold
   const fontSizes = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px']
 
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && content !== editorRef.current.innerHTML) {
       editorRef.current.innerHTML = content
     }
   }, [content])
@@ -274,9 +274,10 @@ const RichTextEditor = ({ content, onContentChange, fieldTags, onInsertPlacehold
         style={{ 
           fontFamily: 'Arial, sans-serif',
           fontSize: '16px',
-          lineHeight: '1.6'
+          lineHeight: '1.6',
+          direction: 'ltr',
+          textAlign: 'left'
         }}
-        dangerouslySetInnerHTML={{ __html: content }}
       />
     </div>
   )

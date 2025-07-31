@@ -39,6 +39,8 @@ body {
   background: linear-gradient(135deg, var(--accent-pink) 0%, var(--accent-white) 100%);
   color: var(--gray-900);
   transition: color 0.3s ease;
+  direction: ltr;
+  text-align: left;
 }
 
 .dark body {
@@ -508,6 +510,19 @@ h1, h2, h3, h4, h5, h6 {
 .dark .header {
   background: var(--gray-800);
   border-bottom-color: var(--gray-700);
+}
+
+/* Content Editable Fixes */
+[contenteditable="true"] {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: normal !important;
+}
+
+[contenteditable="true"] * {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: normal !important;
 }
 
 /* Responsive design */

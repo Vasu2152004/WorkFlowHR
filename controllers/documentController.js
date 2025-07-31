@@ -48,7 +48,7 @@ const getDocumentTemplate = async (req, res) => {
 // Create new document template
 const createDocumentTemplate = async (req, res) => {
   try {
-    const { document_name, field_tags, content } = req.body
+    const { document_name, field_tags, content, settings = {} } = req.body
 
     // Validate required fields
     if (!document_name || !field_tags || !content) {
@@ -91,7 +91,8 @@ const createDocumentTemplate = async (req, res) => {
         created_by: req.user.id,
         document_name: document_name.trim(),
         field_tags: field_tags,
-        content: content
+        content: content,
+        settings: settings
       })
       .select('*')
       .single()

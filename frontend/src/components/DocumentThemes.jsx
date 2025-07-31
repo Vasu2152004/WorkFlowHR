@@ -55,6 +55,150 @@ const DocumentThemes = ({ onSelectTheme, onClose }) => {
       `
     },
     {
+      name: 'Termination Letter',
+      description: 'Professional termination letter template',
+      template: `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
+          <div style="text-align: center; margin-bottom: 40px;">
+            <h1 style="color: #2c3e50; margin-bottom: 10px;">{{company_name}}</h1>
+            <p style="color: #7f8c8d; font-size: 16px;">{{company_address}}</p>
+          </div>
+          
+          <div style="margin-bottom: 30px;">
+            <p style="margin-bottom: 10px;"><strong>Date:</strong> {{current_date}}</p>
+            <p style="margin-bottom: 10px;"><strong>To:</strong> {{employee_name}}</p>
+            <p style="margin-bottom: 10px;"><strong>Subject:</strong> Termination of Employment</p>
+          </div>
+          
+          <div style="line-height: 1.6; margin-bottom: 30px;">
+            <p>Dear {{employee_name}},</p>
+            
+            <p>This letter serves as formal notice of the termination of your employment with {{company_name}}, effective {{termination_date}}.</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Employment Details:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li><strong>Position:</strong> {{job_title}}</li>
+              <li><strong>Department:</strong> {{department}}</li>
+              <li><strong>Employment Start Date:</strong> {{employment_start_date}}</li>
+              <li><strong>Termination Date:</strong> {{termination_date}}</li>
+            </ul>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Final Compensation:</h3>
+            <p>You will receive your final paycheck including any accrued but unused vacation time on {{final_paycheck_date}}.</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Return of Company Property:</h3>
+            <p>Please return all company property including {{company_property_list}} by {{return_deadline}}.</p>
+            
+            <p>We wish you success in your future endeavors.</p>
+            
+            <p style="margin-top: 40px;">Sincerely,</p>
+            <p><strong>{{hr_manager_name}}</strong><br>
+            Human Resources Manager<br>
+            {{company_name}}</p>
+          </div>
+        </div>
+      `
+    },
+    {
+      name: 'Warning Letter',
+      description: 'Employee warning letter template',
+      template: `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
+          <div style="text-align: center; margin-bottom: 40px;">
+            <h1 style="color: #2c3e50; margin-bottom: 10px;">{{company_name}}</h1>
+            <p style="color: #7f8c8d; font-size: 16px;">{{company_address}}</p>
+          </div>
+          
+          <div style="margin-bottom: 30px;">
+            <p style="margin-bottom: 10px;"><strong>Date:</strong> {{current_date}}</p>
+            <p style="margin-bottom: 10px;"><strong>To:</strong> {{employee_name}}</p>
+            <p style="margin-bottom: 10px;"><strong>Subject:</strong> Written Warning</p>
+          </div>
+          
+          <div style="line-height: 1.6; margin-bottom: 30px;">
+            <p>Dear {{employee_name}},</p>
+            
+            <p>This letter serves as a formal written warning regarding {{issue_description}}.</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Incident Details:</h3>
+            <p><strong>Date of Incident:</strong> {{incident_date}}</p>
+            <p><strong>Description:</strong> {{incident_description}}</p>
+            <p><strong>Policy Violation:</strong> {{policy_violation}}</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Expected Behavior:</h3>
+            <p>{{expected_behavior}}</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Consequences:</h3>
+            <p>{{consequences}}</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Improvement Plan:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li>{{improvement_action_1}}</li>
+              <li>{{improvement_action_2}}</li>
+              <li>{{improvement_action_3}}</li>
+            </ul>
+            
+            <p>This warning will remain in your personnel file for {{warning_duration}}. Failure to improve may result in further disciplinary action up to and including termination.</p>
+            
+            <p style="margin-top: 40px;">Sincerely,</p>
+            <p><strong>{{manager_name}}</strong><br>
+            {{manager_title}}<br>
+            {{company_name}}</p>
+          </div>
+        </div>
+      `
+    },
+    {
+      name: 'Appointment Letter',
+      description: 'Employee appointment confirmation letter',
+      template: `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
+          <div style="text-align: center; margin-bottom: 40px;">
+            <h1 style="color: #2c3e50; margin-bottom: 10px;">{{company_name}}</h1>
+            <p style="color: #7f8c8d; font-size: 16px;">{{company_address}}</p>
+          </div>
+          
+          <div style="margin-bottom: 30px;">
+            <p style="margin-bottom: 10px;"><strong>Date:</strong> {{current_date}}</p>
+            <p style="margin-bottom: 10px;"><strong>To:</strong> {{employee_name}}</p>
+            <p style="margin-bottom: 10px;"><strong>Subject:</strong> Appointment Confirmation</p>
+          </div>
+          
+          <div style="line-height: 1.6; margin-bottom: 30px;">
+            <p>Dear {{employee_name}},</p>
+            
+            <p>We are pleased to confirm your appointment as <strong>{{job_title}}</strong> with {{company_name}}.</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Appointment Details:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li><strong>Position:</strong> {{job_title}}</li>
+              <li><strong>Department:</strong> {{department}}</li>
+              <li><strong>Appointment Date:</strong> {{appointment_date}}</li>
+              <li><strong>Reporting To:</strong> {{reporting_manager}}</li>
+              <li><strong>Work Location:</strong> {{work_location}}</li>
+            </ul>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Terms and Conditions:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li>This appointment is subject to {{probation_period}} probation period</li>
+              <li>Salary: {{salary_amount}} per {{salary_period}}</li>
+              <li>Working hours: {{work_hours}} per week</li>
+              <li>Benefits as per company policy</li>
+            </ul>
+            
+            <p>Please report to {{reporting_location}} on {{first_day_date}} at {{reporting_time}}.</p>
+            
+            <p>We look forward to your contribution to our team.</p>
+            
+            <p style="margin-top: 40px;">Sincerely,</p>
+            <p><strong>{{hr_manager_name}}</strong><br>
+            Human Resources Manager<br>
+            {{company_name}}</p>
+          </div>
+        </div>
+      `
+    },
+    {
       name: 'Letter of Recommendation',
       description: 'Professional recommendation letter template',
       template: `
@@ -215,6 +359,160 @@ const DocumentThemes = ({ onSelectTheme, onClose }) => {
               <p><strong>Employee Signature:</strong> _________________________ Date: {{employee_signature_date}}</p>
               <p><strong>Reviewer Signature:</strong> _________________________ Date: {{reviewer_signature_date}}</p>
             </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      name: 'Promotion Letter',
+      description: 'Employee promotion letter template',
+      template: `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
+          <div style="text-align: center; margin-bottom: 40px;">
+            <h1 style="color: #2c3e50; margin-bottom: 10px;">{{company_name}}</h1>
+            <p style="color: #7f8c8d; font-size: 16px;">{{company_address}}</p>
+          </div>
+          
+          <div style="margin-bottom: 30px;">
+            <p style="margin-bottom: 10px;"><strong>Date:</strong> {{current_date}}</p>
+            <p style="margin-bottom: 10px;"><strong>To:</strong> {{employee_name}}</p>
+            <p style="margin-bottom: 10px;"><strong>Subject:</strong> Promotion Notification</p>
+          </div>
+          
+          <div style="line-height: 1.6; margin-bottom: 30px;">
+            <p>Dear {{employee_name}},</p>
+            
+            <p>We are pleased to inform you that you have been promoted to the position of <strong>{{new_job_title}}</strong> effective {{promotion_date}}.</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Promotion Details:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li><strong>Current Position:</strong> {{current_job_title}}</li>
+              <li><strong>New Position:</strong> {{new_job_title}}</li>
+              <li><strong>Department:</strong> {{department}}</li>
+              <li><strong>Effective Date:</strong> {{promotion_date}}</li>
+              <li><strong>New Salary:</strong> {{new_salary_amount}} per {{salary_period}}</li>
+              <li><strong>Reporting To:</strong> {{reporting_manager}}</li>
+            </ul>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">New Responsibilities:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li>{{responsibility_1}}</li>
+              <li>{{responsibility_2}}</li>
+              <li>{{responsibility_3}}</li>
+            </ul>
+            
+            <p>This promotion recognizes your outstanding performance, dedication, and valuable contributions to {{company_name}}.</p>
+            
+            <p>Please schedule a meeting with {{hr_manager_name}} to discuss the details of your new role and responsibilities.</p>
+            
+            <p>Congratulations on your well-deserved promotion!</p>
+            
+            <p style="margin-top: 40px;">Sincerely,</p>
+            <p><strong>{{hr_manager_name}}</strong><br>
+            Human Resources Manager<br>
+            {{company_name}}</p>
+          </div>
+        </div>
+      `
+    },
+    {
+      name: 'Salary Increment Letter',
+      description: 'Salary increase notification letter',
+      template: `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
+          <div style="text-align: center; margin-bottom: 40px;">
+            <h1 style="color: #2c3e50; margin-bottom: 10px;">{{company_name}}</h1>
+            <p style="color: #7f8c8d; font-size: 16px;">{{company_address}}</p>
+          </div>
+          
+          <div style="margin-bottom: 30px;">
+            <p style="margin-bottom: 10px;"><strong>Date:</strong> {{current_date}}</p>
+            <p style="margin-bottom: 10px;"><strong>To:</strong> {{employee_name}}</p>
+            <p style="margin-bottom: 10px;"><strong>Subject:</strong> Salary Increment Notification</p>
+          </div>
+          
+          <div style="line-height: 1.6; margin-bottom: 30px;">
+            <p>Dear {{employee_name}},</p>
+            
+            <p>We are pleased to inform you that your salary has been increased effective {{increment_date}}.</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Salary Details:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li><strong>Current Position:</strong> {{job_title}}</li>
+              <li><strong>Department:</strong> {{department}}</li>
+              <li><strong>Previous Salary:</strong> {{previous_salary_amount}} per {{salary_period}}</li>
+              <li><strong>New Salary:</strong> {{new_salary_amount}} per {{salary_period}}</li>
+              <li><strong>Increment Amount:</strong> {{increment_amount}}</li>
+              <li><strong>Increment Percentage:</strong> {{increment_percentage}}%</li>
+              <li><strong>Effective Date:</strong> {{increment_date}}</li>
+            </ul>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Reason for Increment:</h3>
+            <p>{{increment_reason}}</p>
+            
+            <p>This increment reflects your excellent performance and valuable contributions to {{company_name}}.</p>
+            
+            <p>We appreciate your continued dedication and look forward to your continued success.</p>
+            
+            <p style="margin-top: 40px;">Sincerely,</p>
+            <p><strong>{{hr_manager_name}}</strong><br>
+            Human Resources Manager<br>
+            {{company_name}}</p>
+          </div>
+        </div>
+      `
+    },
+    {
+      name: 'Transfer Letter',
+      description: 'Employee transfer notification letter',
+      template: `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
+          <div style="text-align: center; margin-bottom: 40px;">
+            <h1 style="color: #2c3e50; margin-bottom: 10px;">{{company_name}}</h1>
+            <p style="color: #7f8c8d; font-size: 16px;">{{company_address}}</p>
+          </div>
+          
+          <div style="margin-bottom: 30px;">
+            <p style="margin-bottom: 10px;"><strong>Date:</strong> {{current_date}}</p>
+            <p style="margin-bottom: 10px;"><strong>To:</strong> {{employee_name}}</p>
+            <p style="margin-bottom: 10px;"><strong>Subject:</strong> Transfer Notification</p>
+          </div>
+          
+          <div style="line-height: 1.6; margin-bottom: 30px;">
+            <p>Dear {{employee_name}},</p>
+            
+            <p>This letter serves as formal notification of your transfer within {{company_name}}.</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Transfer Details:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li><strong>Current Position:</strong> {{current_job_title}}</li>
+              <li><strong>New Position:</strong> {{new_job_title}}</li>
+              <li><strong>Current Department:</strong> {{current_department}}</li>
+              <li><strong>New Department:</strong> {{new_department}}</li>
+              <li><strong>Current Location:</strong> {{current_location}}</li>
+              <li><strong>New Location:</strong> {{new_location}}</li>
+              <li><strong>Effective Date:</strong> {{transfer_date}}</li>
+              <li><strong>New Reporting Manager:</strong> {{new_reporting_manager}}</li>
+            </ul>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">Transfer Reason:</h3>
+            <p>{{transfer_reason}}</p>
+            
+            <h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;">New Responsibilities:</h3>
+            <ul style="margin-bottom: 20px;">
+              <li>{{new_responsibility_1}}</li>
+              <li>{{new_responsibility_2}}</li>
+              <li>{{new_responsibility_3}}</li>
+            </ul>
+            
+            <p>Please report to {{new_location}} on {{transfer_date}} and meet with {{new_reporting_manager}} for orientation.</p>
+            
+            <p>We wish you success in your new role.</p>
+            
+            <p style="margin-top: 40px;">Sincerely,</p>
+            <p><strong>{{hr_manager_name}}</strong><br>
+            Human Resources Manager<br>
+            {{company_name}}</p>
           </div>
         </div>
       `
