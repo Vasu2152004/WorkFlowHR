@@ -19,11 +19,12 @@ const Login = () => {
     setLoading(true)
 
     try {
-      await login(formData.email, formData.password)
-      toast.success('Login successful!')
-      navigate('/dashboard')
+      const success = await login(formData.email, formData.password)
+      if (success) {
+        navigate('/dashboard')
+      }
     } catch (error) {
-      toast.error(error.message || 'Login failed')
+      console.error('Login error:', error)
     } finally {
       setLoading(false)
     }

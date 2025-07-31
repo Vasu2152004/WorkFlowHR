@@ -8,9 +8,18 @@ require('dotenv').config();
 // Import routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const documentRoutes = require('./routes/documents');
+
+// Optional email routes
+let emailRoutes = null;
+try {
+  emailRoutes = require('./routes/email');
+} catch (error) {
+  console.log('⚠️ Email routes not available - email functionality disabled');
+}
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet());
@@ -49,6 +58,10 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/documents', documentRoutes);
+if (emailRoutes) {
+  app.use('/api', emailRoutes);
+}
 
 // Serve static files from frontend build
 app.use(express.static(path.join(__dirname, 'frontend/dist')));

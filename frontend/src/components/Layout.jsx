@@ -46,6 +46,8 @@ const Layout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: '📊' },
     { name: 'Employees', href: '/employees', icon: '👥' },
+    { name: 'Document Templates', href: '/create-template', icon: '📄', hrOnly: true },
+    { name: 'Company Profile', href: '/company-profile', icon: '🏢' },
     { name: 'Profile', href: '/profile', icon: '👤' },
   ]
 
@@ -65,17 +67,19 @@ const Layout = ({ children }) => {
             </button>
           </div>
           <nav className="flex-1 px-4 py-6 space-y-2">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className="sidebar-item font-bold text-black"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <span className="mr-3">{item.icon}</span>
-                {item.name}
-              </Link>
-            ))}
+            {navigation
+              .filter(item => !item.hrOnly || user?.role === 'hr')
+              .map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className="sidebar-item font-bold text-black"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <span className="mr-3">{item.icon}</span>
+                  {item.name}
+                </Link>
+              ))}
           </nav>
           <div className="border-t border-blue-700 dark:border-gray-700 px-4 py-4">
             <div className="flex items-center">
@@ -111,16 +115,18 @@ const Layout = ({ children }) => {
             <h2 className="text-xl font-bold text-white">HRMS</h2>
           </div>
           <nav className="flex-1 px-4 py-6 space-y-2">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className="sidebar-item font-bold text-black"
-              >
-                <span className="mr-3">{item.icon}</span>
-                {item.name}
-              </Link>
-            ))}
+            {navigation
+              .filter(item => !item.hrOnly || user?.role === 'hr')
+              .map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className="sidebar-item font-bold text-black"
+                >
+                  <span className="mr-3">{item.icon}</span>
+                  {item.name}
+                </Link>
+              ))}
           </nav>
           <div className="border-t border-blue-700 dark:border-gray-700 px-4 py-4">
             <div className="flex items-center">

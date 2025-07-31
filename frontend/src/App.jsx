@@ -8,7 +8,10 @@ import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import EmployeeDashboard from './pages/EmployeeDashboard'
 import Employees from './pages/Employees'
+import AddEmployee from './pages/AddEmployee'
 import Profile from './pages/Profile'
+import CompanyProfile from './pages/CompanyProfile'
+import CreateTemplate from './pages/CreateTemplate'
 
 function App() {
   return (
@@ -64,10 +67,34 @@ function App() {
             </ProtectedRoute>
           } />
           
+          <Route path="/add-employee" element={
+            <ProtectedRoute>
+              <Layout>
+                <AddEmployee />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
           <Route path="/profile" element={
             <ProtectedRoute>
               <Layout>
                 <Profile />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/company-profile" element={
+            <ProtectedRoute>
+              <Layout>
+                <CompanyProfile />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/create-template" element={
+            <ProtectedRoute>
+              <Layout>
+                <CreateTemplate />
               </Layout>
             </ProtectedRoute>
           } />

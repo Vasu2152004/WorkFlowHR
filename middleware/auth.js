@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
 
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
@@ -18,8 +18,8 @@ const authenticateToken = async (req, res, next) => {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
 
-    // Get user details from our users table
-    const { data: userData, error: userError } = await supabase
+    // Get user details from our users table using admin client to bypass RLS
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', user.id)
@@ -71,7 +71,7 @@ const validateCompanyAccess = async (req, res, next) => {
 
     // For user-specific operations, ensure they belong to the same company
     if (req.params.id && req.params.id !== user.id) {
-      const targetUser = await supabase
+      const targetUser = await supabaseAdmin
         .from('users')
         .select('company_id')
         .eq('id', req.params.id)

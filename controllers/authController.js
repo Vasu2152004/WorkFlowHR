@@ -87,14 +87,57 @@ const login = async (req, res) => {
     }
 
     // Get user details from our users table using admin client to bypass RLS
-    const { data: userData, error: userError } = await supabaseAdmin
+    let { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', authData.user.id)
       .single();
 
+    // If user doesn't exist in users table, create it
     if (userError || !userData) {
-      return res.status(404).json({ error: 'User not found in system' });
+      console.log('User not found in users table, creating...');
+      
+      // Get or create company
+      let companyId;
+      const { data: existingCompany } = await supabaseAdmin
+        .from('companies')
+        .select('id')
+        .eq('name', 'Test Company')
+        .single();
+
+      if (existingCompany) {
+        companyId = existingCompany.id;
+      } else {
+        const { data: newCompany } = await supabaseAdmin
+          .from('companies')
+          .insert([{ name: 'Test Company' }])
+          .select()
+          .single();
+        companyId = newCompany.id;
+      }
+
+      // Create user in users table
+      const { data: newUser, error: createError } = await supabaseAdmin
+        .from('users')
+        .insert([
+          {
+            id: authData.user.id,
+            full_name: authData.user.user_metadata?.full_name || 'User',
+            email: authData.user.email,
+            role: 'hr', // Default to HR for existing users
+            company_id: companyId,
+            password: password // Store password for reference
+          }
+        ])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Failed to create user in database:', createError);
+        return res.status(500).json({ error: 'Failed to create user record' });
+      }
+
+      userData = newUser;
     }
 
     res.json({

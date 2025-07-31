@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { 
   Clock, 
   Calendar, 
@@ -9,11 +10,26 @@ import {
   Bell,
   CheckCircle,
   AlertCircle,
-  Plus
+  Plus,
+  Search,
+  Eye,
+  Users,
+  Mail,
+  Phone,
+  MapPin
 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 
 const EmployeeDashboard = () => {
+  const { user } = useAuth()
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [employees, setEmployees] = useState([])
+  const [filteredEmployees, setFilteredEmployees] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedDepartment, setSelectedDepartment] = useState('')
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -21,6 +37,75 @@ const EmployeeDashboard = () => {
     }, 1000)
     return () => clearInterval(timer)
   }, [])
+
+  // Fetch employees from backend
+  const fetchEmployees = async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error('Authentication token not found')
+        return
+      }
+
+      const response = await fetch('http://localhost:3000/api/users/employees/view', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please login again.')
+          return
+        }
+        throw new Error('Failed to fetch employees')
+      }
+
+      const data = await response.json()
+      setEmployees(data.employees || [])
+      setFilteredEmployees(data.employees || [])
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+      toast.error('Failed to fetch employees')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchEmployees()
+  }, [])
+
+  // Filter employees
+  useEffect(() => {
+    let filtered = employees.filter(employee => {
+      const matchesSearch = employee.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           employee.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           employee.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           employee.designation?.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesDepartment = !selectedDepartment || employee.department === selectedDepartment
+      
+      return matchesSearch && matchesDepartment
+    })
+
+    setFilteredEmployees(filtered)
+  }, [employees, searchTerm, selectedDepartment])
+
+  const handleViewEmployee = (employee) => {
+    setSelectedEmployee(employee)
+    setShowViewModal(true)
+  }
+
+  const getDepartments = () => {
+    const departments = [...new Set(employees.map(emp => emp.department).filter(Boolean))]
+    return departments
+  }
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-IN')
+  }
 
   const quickActions = [
     {
@@ -168,6 +253,123 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
+      {/* Employee Directory */}
+      <div className="card p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-black dark:text-white">
+              Company Directory
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              View your colleagues ({filteredEmployees.length} employees)
+            </p>
+          </div>
+          <button
+            onClick={fetchEmployees}
+            className="btn-secondary flex items-center"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Refresh
+          </button>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search employees..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input-field pl-10"
+            />
+          </div>
+
+          <select
+            value={selectedDepartment}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
+            className="input-field"
+          >
+            <option value="">All Departments</option>
+            {getDepartments().map(dept => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+
+          <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+            <Users className="h-4 w-4 mr-2" />
+            {filteredEmployees.length} employees found
+          </div>
+        </div>
+
+        {/* Employee List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="loading-spinner h-8 w-8"></div>
+          </div>
+        ) : filteredEmployees.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              {searchTerm || selectedDepartment ? 'No employees found' : 'No employees yet'}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              {searchTerm || selectedDepartment 
+                ? 'Try adjusting your search or filters'
+                : 'Employees will appear here once added to the system'
+              }
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredEmployees.map((employee) => (
+              <div key={employee.id} className="card p-4 hover:shadow-medium transition-all duration-300">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center text-white font-semibold mr-3">
+                      {employee.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {employee.full_name}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {employee.designation}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleViewEmployee(employee)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                    title="View Details"
+                  >
+                    <Eye size={16} />
+                  </button>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                    <Mail className="h-3 w-3 mr-2" />
+                    <span className="truncate">{employee.email}</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                    <Building className="h-3 w-3 mr-2" />
+                    <span>{employee.department}</span>
+                  </div>
+                  {employee.phone_number && (
+                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                      <Phone className="h-3 w-3 mr-2" />
+                      <span>{employee.phone_number}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Employee Information */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card p-6">
@@ -177,15 +379,15 @@ const EmployeeDashboard = () => {
           <div className="space-y-3">
             <div className="flex items-center text-black dark:text-gray-400">
               <User className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-              <span>Your Name</span>
+              <span>{user?.full_name || 'Your Name'}</span>
             </div>
             <div className="flex items-center text-black dark:text-gray-400">
               <Building className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-              <span>Your Department</span>
+              <span>{user?.department || 'Your Department'}</span>
             </div>
             <div className="flex items-center text-black dark:text-gray-400">
               <Calendar className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-              <span>Joined: [Date]</span>
+              <span>Joined: {user?.created_at ? formatDate(user.created_at) : '[Date]'}</span>
             </div>
             <div className="flex items-center text-black dark:text-gray-400">
               <TrendingUp className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
@@ -205,6 +407,75 @@ const EmployeeDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* View Employee Modal */}
+      {showViewModal && selectedEmployee && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-strong max-w-md w-full">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Employee Details
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowViewModal(false)
+                    setSelectedEmployee(null)
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center text-white font-semibold mr-4">
+                  {selectedEmployee.full_name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white">
+                    {selectedEmployee.full_name}
+                  </h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedEmployee.designation}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
+                  <p className="text-gray-900 dark:text-white">{selectedEmployee.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Department</label>
+                  <p className="text-gray-900 dark:text-white">{selectedEmployee.department}</p>
+                </div>
+                {selectedEmployee.phone_number && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</label>
+                    <p className="text-gray-900 dark:text-white">{selectedEmployee.phone_number}</p>
+                  </div>
+                )}
+                {selectedEmployee.address && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Address</label>
+                    <p className="text-gray-900 dark:text-white">{selectedEmployee.address}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Joined</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {selectedEmployee.created_at ? formatDate(selectedEmployee.created_at) : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

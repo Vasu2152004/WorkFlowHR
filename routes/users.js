@@ -16,17 +16,29 @@ const validateUpdateEmployee = [
   body('full_name').trim().isLength({ min: 2 })
 ];
 
-// Apply authentication and company validation to all routes
+const validateUpdateCompanyProfile = [
+  body('name').trim().isLength({ min: 2 }),
+  body('email').optional().isEmail().normalizeEmail(),
+  body('website').optional().isURL()
+];
+
+// Apply authentication to all routes
 router.use(authenticateToken);
-router.use(requireHR);
 router.use(validateCompanyAccess);
 
-// Routes
-router.post('/employees', validateAddEmployee, userController.addEmployee);
-router.get('/employees', userController.getEmployees);
-router.get('/employees/:id', userController.getEmployee);
-router.put('/employees/:id', validateUpdateEmployee, userController.updateEmployee);
-router.delete('/employees/:id', userController.deleteEmployee);
-router.post('/employees/:id/reset-password', userController.resetEmployeePassword);
+// Company profile routes
+router.get('/company/profile', userController.getCompanyProfile);
+router.put('/company/profile', requireHR, validateUpdateCompanyProfile, userController.updateCompanyProfile);
+
+// Employee viewing routes (accessible by all authenticated users)
+router.get('/employees/view', userController.getEmployeesForViewing);
+
+// HR-only routes (require HR role)
+router.post('/employees', requireHR, validateAddEmployee, userController.addEmployee);
+router.get('/employees', requireHR, userController.getEmployees);
+router.get('/employees/:id', requireHR, userController.getEmployee);
+router.put('/employees/:id', requireHR, validateUpdateEmployee, userController.updateEmployee);
+router.delete('/employees/:id', requireHR, userController.deleteEmployee);
+router.post('/employees/:id/reset-password', requireHR, userController.resetEmployeePassword);
 
 module.exports = router; 
