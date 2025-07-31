@@ -12,6 +12,7 @@ import AddEmployee from './pages/AddEmployee'
 import Profile from './pages/Profile'
 import CompanyProfile from './pages/CompanyProfile'
 import CreateTemplate from './pages/CreateTemplate'
+import GenerateDocument from './pages/GenerateDocument'
 
 function App() {
   return (
@@ -95,6 +96,14 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <CreateTemplate />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/generate-document" element={
+            <ProtectedRoute>
+              <Layout>
+                <GenerateDocument />
               </Layout>
             </ProtectedRoute>
           } />

@@ -47,6 +47,7 @@ const Layout = ({ children }) => {
     { name: 'Dashboard', href: '/dashboard', icon: '📊' },
     { name: 'Employees', href: '/employees', icon: '👥' },
     { name: 'Document Templates', href: '/create-template', icon: '📄', hrOnly: true },
+    { name: 'Generate Documents', href: '/generate-document', icon: '📋', hrOnly: true },
     { name: 'Company Profile', href: '/company-profile', icon: '🏢' },
     { name: 'Profile', href: '/profile', icon: '👤' },
   ]
