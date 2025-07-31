@@ -9,6 +9,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const documentRoutes = require('./routes/documents');
+const leaveRoutes = require('./routes/leaves');
 
 // Optional email routes
 let emailRoutes = null;
@@ -59,6 +60,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/leaves', leaveRoutes);
 if (emailRoutes) {
   app.use('/api', emailRoutes);
 }

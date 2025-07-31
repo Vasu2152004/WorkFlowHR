@@ -13,6 +13,8 @@ import Profile from './pages/Profile'
 import CompanyProfile from './pages/CompanyProfile'
 import CreateTemplate from './pages/CreateTemplate'
 import GenerateDocument from './pages/GenerateDocument'
+import LeaveRequest from './pages/LeaveRequest'
+import LeaveManagement from './pages/LeaveManagement'
 
 function App() {
   return (
@@ -104,6 +106,22 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <GenerateDocument />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/leave-request" element={
+            <ProtectedRoute>
+              <Layout>
+                <LeaveRequest />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/leave-management" element={
+            <ProtectedRoute>
+              <Layout>
+                <LeaveManagement />
               </Layout>
             </ProtectedRoute>
           } />

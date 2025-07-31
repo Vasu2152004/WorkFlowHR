@@ -51,6 +51,8 @@ const Layout = ({ children }) => {
     { name: 'Employees', href: '/employees', icon: '👥' },
     { name: 'Document Templates', href: '/create-template', icon: '📄', hrOnly: true },
     { name: 'Generate Documents', href: '/generate-document', icon: '📋', hrOnly: true },
+    { name: 'Leave Request', href: '/leave-request', icon: '📅', employeeOnly: true },
+    { name: 'Leave Management', href: '/leave-management', icon: '📋', hrOnly: true },
     { name: 'Company Profile', href: '/company-profile', icon: '🏢' },
     { name: 'Profile', href: '/profile', icon: '👤' },
   ]
@@ -72,7 +74,11 @@ const Layout = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation
-              .filter(item => !item.hrOnly || user?.role === 'hr')
+              .filter(item => {
+                if (item.hrOnly && user?.role !== 'hr') return false
+                if (item.employeeOnly && user?.role !== 'employee') return false
+                return true
+              })
               .map((item) => (
                 <Link
                   key={item.name}
@@ -133,7 +139,11 @@ const Layout = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation
-              .filter(item => !item.hrOnly || user?.role === 'hr')
+              .filter(item => {
+                if (item.hrOnly && user?.role !== 'hr') return false
+                if (item.employeeOnly && user?.role !== 'employee') return false
+                return true
+              })
               .map((item) => (
                 <Link
                   key={item.name}
