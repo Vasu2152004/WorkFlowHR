@@ -15,6 +15,9 @@ import CreateTemplate from './pages/CreateTemplate'
 import GenerateDocument from './pages/GenerateDocument'
 import LeaveRequest from './pages/LeaveRequest'
 import LeaveManagement from './pages/LeaveManagement'
+import AddHRStaff from './pages/AddHRStaff'
+import SalarySlips from './pages/SalarySlips'
+import EmployeeFixedDeductions from './pages/EmployeeFixedDeductions'
 
 function App() {
   return (
@@ -78,6 +81,14 @@ function App() {
             </ProtectedRoute>
           } />
           
+          <Route path="/add-hr-staff" element={
+            <ProtectedRoute>
+              <Layout>
+                <AddHRStaff />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
           <Route path="/profile" element={
             <ProtectedRoute>
               <Layout>
@@ -126,6 +137,22 @@ function App() {
             </ProtectedRoute>
           } />
           
+          <Route path="/salary-slips" element={
+            <ProtectedRoute>
+              <Layout>
+                <SalarySlips />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/employee/:employee_id/fixed-deductions" element={
+            <ProtectedRoute>
+              <Layout>
+                <EmployeeFixedDeductions />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
           {/* Redirect root to dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           
@@ -165,8 +192,11 @@ function RoleBasedDashboard() {
   // Render appropriate dashboard based on user role
   if (user?.role === 'employee') {
     return <EmployeeDashboard />
-  } else {
+  } else if (['hr', 'hr_manager', 'admin'].includes(user?.role)) {
     return <Dashboard />
+  } else {
+    // Default to employee dashboard for unknown roles
+    return <EmployeeDashboard />
   }
 }
 

@@ -1,6 +1,23 @@
 const jwt = require('jsonwebtoken');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 
+// Retry function for Supabase operations
+const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      if (error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.includes('timeout')) {
+        console.log(`🔄 Retrying operation (attempt ${i + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
   try {
@@ -11,55 +28,113 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Access token required' });
     }
 
-    // Verify token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify token with Supabase with retry logic
+    const { data: { user }, error } = await retryOperation(async () => {
+      return await supabase.auth.getUser(token);
+    });
 
     if (error || !user) {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
 
+    console.log('🔍 Auth middleware - User from token:', user.id, user.email);
+
     // Get user details from our users table using admin client to bypass RLS
-    const { data: userData, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    const { data: userData, error: userError } = await retryOperation(async () => {
+      return await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+    });
+
+    console.log('🔍 Auth middleware - User lookup result:', userData ? 'Found' : 'Not found', userError?.message);
 
     if (userError || !userData) {
-      return res.status(403).json({ error: 'User not found in system' });
+      console.log('🔍 Auth middleware - User not found, creating...');
+      
+      // Get or create company with retry
+      let { data: company } = await retryOperation(async () => {
+        return await supabaseAdmin
+          .from('companies')
+          .select('*')
+          .limit(1)
+          .single();
+      });
+
+      if (!company) {
+        const { data: newCompany } = await retryOperation(async () => {
+          return await supabaseAdmin
+            .from('companies')
+            .insert([{ name: 'Default Company' }])
+            .select()
+            .single();
+        });
+        company = newCompany;
+      }
+
+      // Create user record with retry
+      const { data: newUser, error: createError } = await retryOperation(async () => {
+        return await supabaseAdmin
+          .from('users')
+          .insert([{
+            id: user.id,
+            full_name: user.email.split('@')[0],
+            email: user.email,
+            role: 'hr',
+            company_id: company.id,
+            is_active: true
+          }])
+          .select()
+          .single();
+      });
+
+      if (createError) {
+        console.error('🔍 Auth middleware - Error creating user:', createError);
+        return res.status(403).json({ error: 'User not found in system' });
+      }
+
+      req.user = newUser;
+      console.log('🔍 Auth middleware - User created and set:', newUser.id);
+    } else {
+      req.user = userData;
+      console.log('🔍 Auth middleware - User found and set:', userData.id);
     }
 
-    req.user = userData;
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
+    if (error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.includes('timeout')) {
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
+    }
     return res.status(500).json({ error: 'Authentication failed' });
   }
 };
 
-// Middleware to check if user is HR
-const requireHR = (req, res, next) => {
-  if (req.user.role !== 'hr') {
-    return res.status(403).json({ error: 'HR access required' });
-  }
-  next();
+// Hierarchical role checking middleware
+const requireRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.role) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if user has any of the allowed roles
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        error: `Access denied. Required roles: ${allowedRoles.join(', ')}` 
+      });
+    }
+
+    next();
+  };
 };
 
-// Middleware to check if user is employee
-const requireEmployee = (req, res, next) => {
-  if (req.user.role !== 'employee') {
-    return res.status(403).json({ error: 'Employee access required' });
-  }
-  next();
-};
-
-// Middleware to check if user is HR or employee
-const requireHROrEmployee = (req, res, next) => {
-  if (req.user.role !== 'hr' && req.user.role !== 'employee') {
-    return res.status(403).json({ error: 'Valid user access required' });
-  }
-  next();
-};
+// Specific role middleware functions
+const requireHR = requireRole(['hr', 'hr_manager', 'admin']);
+const requireHRManager = requireRole(['hr_manager', 'admin']);
+const requireAdmin = requireRole(['admin']);
+const requireTeamLead = requireRole(['team_lead', 'hr', 'hr_manager', 'admin']);
+const requireEmployee = requireRole(['employee', 'team_lead', 'hr', 'hr_manager', 'admin']);
 
 // Middleware to ensure users can only access their own company data
 const validateCompanyAccess = async (req, res, next) => {
@@ -89,10 +164,70 @@ const validateCompanyAccess = async (req, res, next) => {
   }
 };
 
+// Middleware to check if user can access employee data based on hierarchy
+const validateEmployeeAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const employeeId = req.params.id;
+
+    if (!employeeId) {
+      return next(); // No specific employee ID, let the controller handle it
+    }
+
+    // Get employee details
+    const { data: employee, error } = await supabaseAdmin
+      .from('employees')
+      .select('*')
+      .eq('id', employeeId)
+      .single();
+
+    if (error || !employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // Check access based on role hierarchy
+    let hasAccess = false;
+
+    switch (user.role) {
+      case 'admin':
+        hasAccess = true; // Admin can access all employees
+        break;
+      case 'hr_manager':
+        hasAccess = employee.company_id === user.company_id;
+        break;
+      case 'hr':
+        hasAccess = employee.created_by === user.id || employee.company_id === user.company_id;
+        break;
+      case 'team_lead':
+        hasAccess = employee.team_lead_id === user.id;
+        break;
+      case 'employee':
+        hasAccess = employee.user_id === user.id;
+        break;
+      default:
+        hasAccess = false;
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied to this employee' });
+    }
+
+    req.targetEmployee = employee;
+    next();
+  } catch (error) {
+    console.error('Employee access validation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   authenticateToken,
   requireHR,
+  requireHRManager,
+  requireAdmin,
+  requireTeamLead,
   requireEmployee,
-  requireHROrEmployee,
-  validateCompanyAccess
+  requireRole,
+  validateCompanyAccess,
+  validateEmployeeAccess
 }; 

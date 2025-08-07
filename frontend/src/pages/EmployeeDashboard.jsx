@@ -16,12 +16,15 @@ import {
   Users,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  DollarSign,
+  Download,
+  RefreshCw
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
 const EmployeeDashboard = () => {
-  const { user } = useAuth()
+  const { user, API_BASE_URL } = useAuth()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [employees, setEmployees] = useState([])
   const [filteredEmployees, setFilteredEmployees] = useState([])
@@ -30,6 +33,8 @@ const EmployeeDashboard = () => {
   const [selectedDepartment, setSelectedDepartment] = useState('')
   const [showViewModal, setShowViewModal] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const [salarySlips, setSalarySlips] = useState([])
+  const [loadingSlips, setLoadingSlips] = useState(false)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -48,7 +53,7 @@ const EmployeeDashboard = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3000/api/users/employees/view', {
+      const response = await fetch(`${API_BASE_URL}/users/employees/view`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -73,8 +78,43 @@ const EmployeeDashboard = () => {
     }
   }
 
+  // Fetch salary slips for current employee
+  const fetchSalarySlips = async () => {
+    setLoadingSlips(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error('Authentication token not found')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/salary/my-slips`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please login again.')
+          return
+        }
+        throw new Error('Failed to fetch salary slips')
+      }
+
+      const data = await response.json()
+      setSalarySlips(data.salarySlips || [])
+    } catch (error) {
+      console.error('Error fetching salary slips:', error)
+      toast.error('Failed to fetch salary slips')
+    } finally {
+      setLoadingSlips(false)
+    }
+  }
+
   useEffect(() => {
     fetchEmployees()
+    fetchSalarySlips()
   }, [])
 
   // Filter employees
@@ -97,6 +137,49 @@ const EmployeeDashboard = () => {
     setSelectedEmployee(employee)
     setShowViewModal(true)
   }
+
+  const handleViewSalarySlip = (slipId) => {
+    // Navigate to salary slip detail page
+    window.open(`/salary-slip/${slipId}`, '_blank');
+  };
+
+  const handleDownloadSalarySlip = async (slipId) => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error('Authentication token not found')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/salary/my-slips/${slipId}/download`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please login again.')
+          return
+        }
+        throw new Error('Failed to download salary slip')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `salary_slip_${slipId}.pdf` // Suggest a filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      toast.success('Salary slip downloaded successfully!')
+    } catch (error) {
+      console.error('Error downloading salary slip:', error)
+      toast.error('Failed to download salary slip')
+    }
+  };
 
   const getDepartments = () => {
     const departments = [...new Set(employees.map(emp => emp.department).filter(Boolean))]
@@ -251,6 +334,85 @@ const EmployeeDashboard = () => {
             <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Events will appear here when scheduled</p>
           </div>
         </div>
+      </div>
+
+      {/* Salary Slips Section */}
+      <div className="card p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-black dark:text-white">
+              My Salary Slips
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              View and download your salary slips
+            </p>
+          </div>
+          <button
+            onClick={fetchSalarySlips}
+            disabled={loadingSlips}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loadingSlips ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        {loadingSlips ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">Loading salary slips...</p>
+          </div>
+        ) : salarySlips.length === 0 ? (
+          <div className="text-center py-8">
+            <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-black dark:text-gray-400">No salary slips found</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+              Salary slips will appear here once generated by HR
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {salarySlips.map((slip) => (
+              <div key={slip.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-green-600 to-green-700 flex items-center justify-center">
+                      <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                        {new Date(slip.year, slip.month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Net Salary: ₹{slip.net_salary?.toLocaleString() || '0'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">
+                        Generated on: {new Date(slip.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleViewSalarySlip(slip.id)}
+                      className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                    >
+                      <Eye className="h-3 w-3" />
+                      <span>View</span>
+                    </button>
+                    <button
+                      onClick={() => handleDownloadSalarySlip(slip.id)}
+                      className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                    >
+                      <Download className="h-3 w-3" />
+                      <span>Download</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Employee Directory */}

@@ -49,6 +49,8 @@ const Layout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: '📊' },
     { name: 'Employees', href: '/employees', icon: '👥' },
+    { name: 'Add HR Staff', href: '/add-hr-staff', icon: '👨‍💼', adminOnly: true },
+    { name: 'Salary Slips', href: '/salary-slips', icon: '💰', hrOnly: true },
     { name: 'Document Templates', href: '/create-template', icon: '📄', hrOnly: true },
     { name: 'Generate Documents', href: '/generate-document', icon: '📋', hrOnly: true },
     { name: 'Leave Request', href: '/leave-request', icon: '📅', employeeOnly: true },
@@ -75,8 +77,9 @@ const Layout = ({ children }) => {
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation
               .filter(item => {
-                if (item.hrOnly && user?.role !== 'hr') return false
+                if (item.hrOnly && !['hr', 'hr_manager', 'admin'].includes(user?.role)) return false
                 if (item.employeeOnly && user?.role !== 'employee') return false
+                if (item.adminOnly && user?.role !== 'admin') return false
                 return true
               })
               .map((item) => (
@@ -140,8 +143,9 @@ const Layout = ({ children }) => {
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation
               .filter(item => {
-                if (item.hrOnly && user?.role !== 'hr') return false
+                if (item.hrOnly && !['hr', 'hr_manager', 'admin'].includes(user?.role)) return false
                 if (item.employeeOnly && user?.role !== 'employee') return false
+                if (item.adminOnly && user?.role !== 'admin') return false
                 return true
               })
               .map((item) => (

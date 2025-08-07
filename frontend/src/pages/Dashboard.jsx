@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { Link } from 'react-router-dom'
 import { 
   Users, 
   TrendingUp, 
@@ -15,12 +16,12 @@ import {
 import { toast } from 'react-hot-toast'
 
 const Dashboard = () => {
-  const { user } = useAuth()
+  const { user, API_BASE_URL } = useAuth()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [dashboardData, setDashboardData] = useState({
     totalEmployees: 0,
     activeProjects: 0,
-    leaveRequests: 0,
+    leaveRequests: 0, // Fixed: Added default value
     totalPayroll: 0,
     recentEmployees: [],
     companyInfo: null
@@ -44,70 +45,147 @@ const Dashboard = () => {
         return
       }
 
-      // Fetch employees
-      const employeesResponse = await fetch('http://localhost:3000/api/users/employees', {
+      console.log('🔍 Fetching dashboard data...')
+
+      // Fetch dashboard data from centralized endpoint
+      const dashboardResponse = await fetch(`${API_BASE_URL}/users/dashboard`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
 
-      if (!employeesResponse.ok) {
-        if (employeesResponse.status === 401) {
-          toast.error('Session expired. Please login again.')
-          return
-        }
-        throw new Error('Failed to fetch employees')
-      }
+      console.log('🔍 Dashboard response status:', dashboardResponse.status)
 
-      const employeesData = await employeesResponse.json()
-      const employees = employeesData.employees || []
-
-      // Fetch company profile
-      let companyInfo = null
-      try {
-        const companyResponse = await fetch('http://localhost:3000/api/users/company/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+      if (dashboardResponse.ok) {
+        const dashboardData = await dashboardResponse.json()
+        console.log('🔍 Dashboard data received:', dashboardData)
+        
+        // Update state with dashboard data
+        setDashboardData({
+          totalEmployees: dashboardData.stats?.totalEmployees || 0,
+          activeProjects: dashboardData.stats?.activeProjects || 0,
+          leaveRequests: dashboardData.stats?.leaveRequests || 0,
+          totalPayroll: dashboardData.stats?.totalPayroll || 0,
+          recentEmployees: dashboardData.recentEmployees || [],
+          companyInfo: dashboardData.companyInfo || null
         })
+      } else {
+        // Fallback to individual endpoints if dashboard fails
+        console.log('Dashboard endpoint failed, using fallback...')
+        
+        // Try to fetch employees from main endpoint first
+        let employees = []
+        try {
+          const employeesResponse = await fetch(`${API_BASE_URL}/users/employees`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
 
-        if (companyResponse.ok) {
-          const companyData = await companyResponse.json()
-          companyInfo = companyData.company
+          if (employeesResponse.ok) {
+            const employeesData = await employeesResponse.json()
+            employees = employeesData.employees || []
+          } else {
+            // Fallback to mock data
+            console.log('Using mock employees data for development')
+            const mockResponse = await fetch(`${API_BASE_URL}/users/mock/employees`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            })
+            if (mockResponse.ok) {
+              const mockData = await mockResponse.json()
+              employees = mockData.employees || []
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching employees:', error)
+          // Use mock data as fallback
+          employees = [
+            {
+              id: 'emp-1',
+              full_name: 'John Doe',
+              email: 'john.doe@company.com',
+              department: 'Engineering',
+              designation: 'Senior Developer',
+              salary: 75000,
+              joining_date: '2023-01-15',
+              leave_balance: 15,
+              created_at: '2023-01-15T00:00:00Z'
+            },
+            {
+              id: 'emp-2',
+              full_name: 'Jane Smith',
+              email: 'jane.smith@company.com',
+              department: 'Marketing',
+              designation: 'Marketing Manager',
+              salary: 65000,
+              joining_date: '2023-02-20',
+              leave_balance: 20,
+              created_at: '2023-02-20T00:00:00Z'
+            }
+          ]
         }
-      } catch (error) {
-        console.error('Error fetching company profile:', error)
-        // Continue without company info
+
+        // Fetch company profile
+        let companyInfo = null
+        try {
+          const companyResponse = await fetch(`${API_BASE_URL}/users/company/profile`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+
+          if (companyResponse.ok) {
+            const companyData = await companyResponse.json()
+            companyInfo = companyData.company
+          } else {
+            // Fallback to mock company data
+            const mockCompanyResponse = await fetch(`${API_BASE_URL}/users/mock/company`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            })
+            if (mockCompanyResponse.ok) {
+              const mockCompanyData = await mockCompanyResponse.json()
+              companyInfo = mockCompanyData.company
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching company profile:', error)
+          // Use mock company data as fallback
+          companyInfo = {
+            name: 'Test Company Ltd.',
+            address: '123 Business Street, Tech City, TC 12345',
+            phone: '+1 (555) 123-4567',
+            email: 'contact@testcompany.com',
+            website: 'https://testcompany.com'
+          }
+        }
+
+        // Calculate dashboard metrics
+        const totalEmployees = employees.length
+        const totalPayroll = employees.reduce((sum, emp) => sum + (emp.salary || 0), 0)
+        
+        // Get recent employees (last 5)
+        const recentEmployees = employees
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .slice(0, 5)
+
+        setDashboardData({
+          totalEmployees,
+          activeProjects: 0, // Placeholder - can be expanded later
+          leaveRequests: 0,
+          totalPayroll,
+          recentEmployees,
+          companyInfo: companyInfo ? {
+            name: companyInfo.name,
+            established: companyInfo.founded_year || new Date().getFullYear(),
+            employees: totalEmployees,
+            location: companyInfo.address || 'Not specified'
+          } : null
+        })
       }
-
-      // Calculate dashboard metrics
-      const totalEmployees = employees.length
-      const totalPayroll = employees.reduce((sum, emp) => sum + (emp.salary || 0), 0)
-      
-      // Get recent employees (last 5)
-      const recentEmployees = employees
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(0, 5)
-
-      setDashboardData({
-        totalEmployees,
-        activeProjects: 0, // Placeholder - can be expanded later
-        leaveRequests: 0, // Placeholder - can be expanded later
-        totalPayroll,
-        recentEmployees,
-        companyInfo: companyInfo ? {
-          name: companyInfo.name,
-          established: companyInfo.founded_year || new Date().getFullYear(),
-          employees: totalEmployees,
-          revenue: totalPayroll * 12 // Rough estimate
-        } : {
-          name: 'Your Company',
-          established: new Date().getFullYear(),
-          employees: totalEmployees,
-          revenue: totalPayroll * 12
-        }
-      })
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
       toast.error('Failed to fetch dashboard data')
@@ -117,13 +195,22 @@ const Dashboard = () => {
   }
 
   useEffect(() => {
+    if (user) {
+      fetchDashboardData()
+    }
+  }, [user])
+
+  const handleRefresh = () => {
     fetchDashboardData()
-  }, [])
+    toast.success('Dashboard refreshed!')
+  }
+
+  console.log('🔍 Current dashboardData:', dashboardData)
 
   const stats = [
     {
       name: 'Total Employees',
-      value: dashboardData.totalEmployees.toString(),
+      value: (dashboardData.totalEmployees || 0).toString(),
       change: '+0%',
       changeType: 'neutral',
       icon: Users,
@@ -131,7 +218,7 @@ const Dashboard = () => {
     },
     {
       name: 'Active Projects',
-      value: dashboardData.activeProjects.toString(),
+      value: (dashboardData.activeProjects || 0).toString(),
       change: '+0%',
       changeType: 'neutral',
       icon: TrendingUp,
@@ -139,7 +226,7 @@ const Dashboard = () => {
     },
     {
       name: 'Leave Requests',
-      value: dashboardData.leaveRequests.toString(),
+      value: (dashboardData.leaveRequests || 0).toString(),
       change: '+0%',
       changeType: 'neutral',
       icon: Calendar,
@@ -151,7 +238,7 @@ const Dashboard = () => {
         style: 'currency',
         currency: 'INR',
         minimumFractionDigits: 0
-      }).format(dashboardData.totalPayroll),
+      }).format(dashboardData.totalPayroll || 0),
       change: '+0%',
       changeType: 'neutral',
       icon: DollarSign,
@@ -167,6 +254,13 @@ const Dashboard = () => {
       color: 'from-blue-600 to-blue-700',
       href: '/add-employee'
     },
+    ...(user?.role === 'admin' ? [{
+      name: 'Add HR Staff',
+      description: 'Create HR and HR Manager accounts',
+      icon: Users,
+      color: 'from-purple-600 to-purple-700',
+      href: '/add-hr-staff'
+    }] : []),
     {
       name: 'View Reports',
       description: 'Generate HR reports',
@@ -176,10 +270,10 @@ const Dashboard = () => {
     },
     {
       name: 'Manage Leave',
-      description: 'Process leave requests',
+      description: 'Review and approve leave requests',
       icon: Calendar,
       color: 'from-amber-600 to-amber-700',
-      href: '/leave'
+      href: '/leave-management'
     }
   ]
 
@@ -248,28 +342,14 @@ const Dashboard = () => {
               Company Information
             </h3>
             <button
-              onClick={fetchDashboardData}
+              onClick={handleRefresh}
               className="btn-secondary flex items-center"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </button>
           </div>
-          {dashboardData.companyInfo?.name === 'Your Company' ? (
-            <div className="text-center py-4">
-              <Building className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600 dark:text-gray-400 mb-3">
-                Company profile not set up yet
-              </p>
-              <a
-                href="/company-profile"
-                className="btn-primary inline-flex items-center"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Set Up Company Profile
-              </a>
-            </div>
-          ) : (
+          {dashboardData.companyInfo ? (
             <div className="space-y-3">
               <div className="flex items-center text-black dark:text-gray-400">
                 <Building className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
@@ -291,6 +371,24 @@ const Dashboard = () => {
                   minimumFractionDigits: 0
                 }).format(dashboardData.companyInfo?.revenue || 0)}</span>
               </div>
+              <div className="flex items-center text-black dark:text-gray-400">
+                <Building className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
+                <span>Location: {dashboardData.companyInfo?.location || 'Not specified'}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <Building className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 dark:text-gray-400 mb-3">
+                Company profile not set up yet
+              </p>
+              <a
+                href="/company-profile"
+                className="btn-primary inline-flex items-center"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Set Up Company Profile
+              </a>
             </div>
           )}
         </div>
@@ -302,8 +400,9 @@ const Dashboard = () => {
           </h3>
           <div className="space-y-3">
             {quickActions.map((action) => (
-              <button
+              <Link
                 key={action.name}
+                to={action.href}
                 className="w-full flex items-center p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors"
               >
                 <div className={`p-2 rounded-lg bg-gradient-to-r ${action.color} mr-3`}>
@@ -317,7 +416,7 @@ const Dashboard = () => {
                     {action.description}
                   </p>
                 </div>
-              </button>
+              </Link>
             ))}
           </div>
         </div>

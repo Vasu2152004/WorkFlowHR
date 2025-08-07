@@ -9,7 +9,8 @@ const Signup = () => {
     full_name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    company_name: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -28,7 +29,7 @@ const Signup = () => {
     setLoading(true)
 
     try {
-      await signup(formData.full_name, formData.email, formData.password)
+      await signup(formData.full_name, formData.email, formData.password, formData.company_name)
       toast.success('Account created successfully!')
       navigate('/dashboard')
     } catch (error) {
@@ -93,6 +94,22 @@ const Signup = () => {
                 required
                 className="input-field"
                 placeholder="Enter your email"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="company_name" className="form-label">
+                Company Name
+              </label>
+              <input
+                type="text"
+                id="company_name"
+                name="company_name"
+                value={formData.company_name}
+                onChange={handleChange}
+                required
+                className="input-field"
+                placeholder="Enter your company name"
               />
             </div>
 

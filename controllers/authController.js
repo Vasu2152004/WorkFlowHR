@@ -1,19 +1,14 @@
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { generatePassword } = require('../utils/passwordGenerator');
 
-// HR Signup - Only HR users can sign up
-const hrSignup = async (req, res) => {
+// Admin Signup - Only admins can sign up initially
+const adminSignup = async (req, res) => {
   try {
     const { email, password, full_name, company_name } = req.body;
 
-    // Validate required fields
-    if (!email || !password || !full_name || !company_name) {
-      return res.status(400).json({ 
-        error: 'Email, password, full name, and company name are required' 
-      });
-    }
+    // Validation is handled by route middleware
 
-    // First, create the company
+    // Create company
     const { data: company, error: companyError } = await supabaseAdmin
       .from('companies')
       .insert([{ name: company_name }])
@@ -35,34 +30,163 @@ const hrSignup = async (req, res) => {
       return res.status(400).json({ error: authError.message });
     }
 
-    // Manually create the user in our users table
-    const { error: userError } = await supabaseAdmin
-      .rpc('create_hr_user', {
-        user_id: authData.user.id,
+    // Create admin user in our users table
+    const { data: userRecord, error: userError } = await supabaseAdmin
+      .from('users')
+      .insert([{
+        id: authData.user.id,
         full_name: full_name,
         email: email,
-        password: password,
-        company_id: company.id
-      });
+        role: 'admin',
+        company_id: company.id,
+        is_active: true
+      }])
+      .select()
+      .single();
 
     if (userError) {
       // If user creation fails, delete the auth user
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return res.status(500).json({ error: 'Failed to create user in database' });
     }
+    
     res.status(201).json({
-      message: 'HR user created successfully',
+      message: 'Admin user created successfully',
       user: {
         id: authData.user.id,
         email: authData.user.email,
         full_name,
-        role: 'hr',
+        role: 'admin',
         company_id: company.id
       }
     });
 
   } catch (error) {
-    console.error('HR signup error:', error);
+    console.error('Admin signup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Add HR Manager (Admin only)
+const addHRManager = async (req, res) => {
+  try {
+    const { email, password, full_name } = req.body;
+    const currentUser = req.user;
+
+    // Check if current user is admin
+    if (currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can add HR managers' });
+    }
+
+    // Validation is handled by route middleware
+
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true
+    });
+
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    // Create HR manager in our users table
+    const { data: userRecord, error: userError } = await supabaseAdmin
+      .from('users')
+      .insert([{
+        id: authData.user.id,
+        full_name: full_name,
+        email: email,
+        role: 'hr_manager',
+        company_id: currentUser.company_id,
+        created_by: currentUser.id,
+        is_active: true
+      }])
+      .select()
+      .single();
+
+    if (userError) {
+      // If user creation fails, delete the auth user
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return res.status(500).json({ error: 'Failed to create HR manager in database' });
+    }
+    
+    res.status(201).json({
+      message: 'HR Manager added successfully',
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        full_name,
+        role: 'hr_manager',
+        company_id: currentUser.company_id
+      }
+    });
+
+  } catch (error) {
+    console.error('Add HR manager error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Add HR Staff (Admin or HR Manager)
+const addHRStaff = async (req, res) => {
+  try {
+    const { email, password, full_name } = req.body;
+    const currentUser = req.user;
+
+    // Check if current user is admin or HR manager
+    if (!['admin', 'hr_manager'].includes(currentUser.role)) {
+      return res.status(403).json({ error: 'Only admins and HR managers can add HR staff' });
+    }
+
+    // Validation is handled by route middleware
+
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true
+    });
+
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    // Create HR staff in our users table
+    const { data: userRecord, error: userError } = await supabaseAdmin
+      .from('users')
+      .insert([{
+        id: authData.user.id,
+        full_name: full_name,
+        email: email,
+        role: 'hr',
+        company_id: currentUser.company_id,
+        created_by: currentUser.id,
+        is_active: true
+      }])
+      .select()
+      .single();
+
+    if (userError) {
+      // If user creation fails, delete the auth user
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return res.status(500).json({ error: 'Failed to create HR staff in database' });
+    }
+    
+    res.status(201).json({
+      message: 'HR Staff added successfully',
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        full_name,
+        role: 'hr',
+        company_id: currentUser.company_id
+      }
+    });
+
+  } catch (error) {
+    console.error('Add HR staff error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -72,11 +196,12 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Basic validation for login
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Authenticate with Supabase
+    // Supabase authentication
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -98,42 +223,37 @@ const login = async (req, res) => {
       console.log('User not found in users table, creating...');
       
       // Get or create company
-      let companyId;
-      const { data: existingCompany } = await supabaseAdmin
+      let { data: company } = await supabaseAdmin
         .from('companies')
-        .select('id')
-        .eq('name', 'Test Company')
+        .select('*')
+        .limit(1)
         .single();
 
-      if (existingCompany) {
-        companyId = existingCompany.id;
-      } else {
+      if (!company) {
         const { data: newCompany } = await supabaseAdmin
           .from('companies')
-          .insert([{ name: 'Test Company' }])
+          .insert([{ name: 'Default Company' }])
           .select()
           .single();
-        companyId = newCompany.id;
+        company = newCompany;
       }
 
-      // Create user in users table
-      const { data: newUser, error: createError } = await supabaseAdmin
+      // Create user record
+      const { data: newUser, error: createUserError } = await supabaseAdmin
         .from('users')
-        .insert([
-          {
-            id: authData.user.id,
-            full_name: authData.user.user_metadata?.full_name || 'User',
-            email: authData.user.email,
-            role: 'hr', // Default to HR for existing users
-            company_id: companyId,
-            password: password // Store password for reference
-          }
-        ])
+        .insert([{
+          id: authData.user.id,
+          full_name: authData.user.email.split('@')[0],
+          email: authData.user.email,
+          role: 'employee',
+          company_id: company.id,
+          is_active: true
+        }])
         .select()
         .single();
 
-      if (createError) {
-        console.error('Failed to create user in database:', createError);
+      if (createUserError) {
+        console.error('Error creating user record:', createUserError);
         return res.status(500).json({ error: 'Failed to create user record' });
       }
 
@@ -141,14 +261,7 @@ const login = async (req, res) => {
     }
 
     res.json({
-      message: 'Login successful',
-      user: {
-        id: userData.id,
-        email: userData.email,
-        full_name: userData.full_name,
-        role: userData.role,
-        company_id: userData.company_id
-      },
+      user: userData,
       access_token: authData.session.access_token,
       refresh_token: authData.session.refresh_token
     });
@@ -178,17 +291,21 @@ const logout = async (req, res) => {
 // Get current user profile
 const getProfile = async (req, res) => {
   try {
-    const { data: user, error } = await supabase
+    console.log('🔍 getProfile - User ID:', req.user.id);
+    
+    const { data: user, error } = await supabaseAdmin
       .from('users')
       .select('id, full_name, email, role, company_id, created_at')
       .eq('id', req.user.id)
       .single();
 
+    console.log('🔍 getProfile - Query result:', user ? 'Found' : 'Not found', error?.message);
+
     if (error || !user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user });
+    res.json(user);
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -224,7 +341,9 @@ const refreshToken = async (req, res) => {
 };
 
 module.exports = {
-  hrSignup,
+  adminSignup,
+  addHRManager,
+  addHRStaff,
   login,
   logout,
   getProfile,

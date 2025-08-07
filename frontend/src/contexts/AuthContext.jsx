@@ -4,6 +4,9 @@ import toast from 'react-hot-toast'
 
 const AuthContext = createContext()
 
+// Backend API URL
+const API_BASE_URL = 'http://localhost:3000/api'
+
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
@@ -29,12 +32,14 @@ export const AuthProvider = ({ children }) => {
   const fetchProfile = async () => {
     try {
       console.log('🔄 Fetching user profile...')
-      const response = await axios.get('/api/auth/profile')
+      const response = await axios.get(`${API_BASE_URL}/auth/profile`)
       console.log('✅ Profile fetched:', response.data.user)
       setUser(response.data.user)
     } catch (error) {
       console.error('❌ Error fetching profile:', error)
-      logout()
+      if (error.response?.status === 401) {
+        logout()
+      }
     } finally {
       setLoading(false)
     }
@@ -43,7 +48,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       console.log('🔐 Attempting login for:', email)
-      const response = await axios.post('/api/auth/login', { email, password })
+      const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password })
       const { access_token, refresh_token, user } = response.data
       
       console.log('✅ Login successful, user data:', user)
@@ -62,9 +67,15 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const signup = async (userData) => {
+  const signup = async (full_name, email, password, company_name) => {
     try {
-      const response = await axios.post('/api/auth/signup', userData)
+      const userData = {
+        full_name,
+        email,
+        password,
+        company_name
+      }
+      const response = await axios.post(`${API_BASE_URL}/auth/signup`, userData)
       toast.success('Account created successfully! Please login.')
       return true
     } catch (error) {
@@ -87,7 +98,8 @@ export const AuthProvider = ({ children }) => {
     signup,
     logout,
     loading,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    API_BASE_URL
   }
 
   return (

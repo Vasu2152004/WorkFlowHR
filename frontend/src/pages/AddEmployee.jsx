@@ -72,16 +72,16 @@ export default function AddEmployee() {
       return
     }
 
-    // Check if user is HR
-    if (user.role !== 'hr') {
-      toast.error('Only HR can create employees')
-      navigate('/dashboard')
-      return
-    }
+      // Check if user has permission to add employees
+  if (!['admin', 'hr_manager', 'hr'].includes(user.role)) {
+    toast.error('Only Admin, HR Manager, and HR can create employees')
+    navigate('/dashboard')
+    return
+  }
   }, [isAuthenticated, user, navigate])
 
   // If not authenticated, don't render the component
-  if (!isAuthenticated || !user || user.role !== 'hr') {
+  if (!isAuthenticated || !user || !['admin', 'hr_manager', 'hr'].includes(user.role)) {
     return null
   }
 

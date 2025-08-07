@@ -1,7 +1,7 @@
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { generateEmployeePassword, generateEmployeeId } = require('../utils/passwordGenerator');
 
-// Add employee (HR only) - Comprehensive creation
+// Add employee (HR/HR Manager/Admin only) - Comprehensive creation
 const addEmployee = async (req, res) => {
   try {
     const { 
@@ -16,16 +16,45 @@ const addEmployee = async (req, res) => {
       emergency_contact,
       pan_number,
       bank_account,
-      leave_balance = 20
+      leave_balance = 20,
+      team_lead_id = null // New field for team lead assignment
     } = req.body;
     
-    const hrUser = req.user;
+    const currentUser = req.user;
+
+    // Check if user has permission to add employees
+    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return res.status(403).json({ 
+        error: 'Only Admin, HR Manager, and HR can add employees' 
+      });
+    }
 
     // Validate required fields
     if (!email || !full_name || !department || !designation || !salary || !joining_date) {
       return res.status(400).json({ 
         error: 'Email, full name, department, designation, salary, and joining date are required' 
       });
+    }
+
+    // Validate team lead if provided
+    if (team_lead_id) {
+      const { data: teamLead, error: teamLeadError } = await supabaseAdmin
+        .from('users')
+        .select('id, role, company_id')
+        .eq('id', team_lead_id)
+        .single();
+
+      if (teamLeadError || !teamLead) {
+        return res.status(400).json({ error: 'Invalid team lead ID' });
+      }
+
+      if (teamLead.role !== 'team_lead') {
+        return res.status(400).json({ error: 'Selected user is not a team lead' });
+      }
+
+      if (teamLead.company_id !== currentUser.company_id) {
+        return res.status(400).json({ error: 'Team lead must be from the same company' });
+      }
     }
 
     // Generate employee ID and password
@@ -41,6 +70,27 @@ const addEmployee = async (req, res) => {
 
     if (authError) {
       return res.status(400).json({ error: authError.message });
+    }
+
+    // Create user record in our users table
+    const { data: userRecord, error: userError } = await supabaseAdmin
+      .from('users')
+      .insert([{
+        id: authData.user.id,
+        full_name: full_name,
+        email: email,
+        role: 'employee',
+        company_id: currentUser.company_id,
+        created_by: currentUser.id,
+        is_active: true
+      }])
+      .select()
+      .single();
+
+    if (userError) {
+      // If user creation fails, delete the auth user
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
     }
 
     // Create comprehensive employee record
@@ -59,9 +109,9 @@ const addEmployee = async (req, res) => {
       pan_number: pan_number || null,
       bank_account: bank_account || null,
       leave_balance: parseInt(leave_balance),
-      role: 'employee',
-      company_id: hrUser.company_id,
-      password: employeePassword // Store for email
+      created_by: currentUser.id, // Track who created this employee
+      team_lead_id: team_lead_id, // Team lead assignment
+      company_id: currentUser.company_id
     };
 
     // Insert into employees table using admin client to bypass RLS
@@ -72,28 +122,10 @@ const addEmployee = async (req, res) => {
       .single();
 
     if (employeeError) {
-      // If employee creation fails, delete the auth user
+      // If employee creation fails, delete both auth user and user record
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      await supabaseAdmin.from('users').delete().eq('id', authData.user.id);
       return res.status(500).json({ error: 'Failed to create employee record: ' + employeeError.message });
-    }
-
-    // Also insert into users table using admin client to bypass RLS
-    const { error: userError } = await supabaseAdmin
-      .from('users')
-      .insert([{
-        id: authData.user.id,
-        full_name: full_name,
-        email: email,
-        password: employeePassword,
-        role: 'employee',
-        company_id: hrUser.company_id
-      }]);
-
-    if (userError) {
-      // If user creation fails, delete the auth user and employee record
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      await supabaseAdmin.from('employees').delete().eq('user_id', authData.user.id);
-      return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
     }
 
     // Send welcome email with credentials
@@ -155,7 +187,7 @@ const addEmployee = async (req, res) => {
         salary: parseFloat(salary),
         joining_date,
         role: 'employee',
-        company_id: hrUser.company_id,
+        company_id: currentUser.company_id,
         password: employeePassword // Return password for HR reference
       }
     });
@@ -166,21 +198,90 @@ const addEmployee = async (req, res) => {
   }
 };
 
-// Get all employees (HR only)
+// Get all employees (Role-based access)
 const getEmployees = async (req, res) => {
   try {
-    const { data: employees, error } = await supabase
-      .from('employees')
-      .select('id, user_id, employee_id, full_name, email, department, designation, salary, joining_date, phone_number, address, emergency_contact, pan_number, bank_account, leave_balance, role, company_id, created_at, updated_at')
-      .eq('company_id', req.user.company_id)
-      .eq('role', 'employee')
-      .order('created_at', { ascending: false });
+    const currentUser = req.user;
+    console.log('🔍 getEmployees - User:', currentUser.full_name, 'Role:', currentUser.role, 'Company ID:', currentUser.company_id);
 
-    if (error) {
-      return res.status(500).json({ error: 'Failed to fetch employees' });
+    // Build base query with proper joins
+    let query = supabaseAdmin
+      .from('employees')
+      .select(`
+        *,
+        users!employees_user_id_fkey(id, full_name, email, role, company_id, is_active),
+        team_lead:users!employees_team_lead_id_fkey(id, full_name, email, role),
+        creator:users!employees_created_by_fkey(id, full_name, email, role)
+      `);
+
+    // Apply role-based filtering based on hierarchy
+    switch (currentUser.role) {
+      case 'admin':
+        // Admin can see all employees in their company only
+        console.log('🔍 getEmployees - Admin user, filtering by company_id:', currentUser.company_id);
+        query = query.eq('company_id', currentUser.company_id);
+        break;
+        
+      case 'hr_manager':
+        // HR Manager can see all employees in their company
+        console.log('🔍 getEmployees - HR Manager, filtering by company_id:', currentUser.company_id);
+        query = query.eq('company_id', currentUser.company_id);
+        break;
+        
+      case 'hr':
+        // HR can see employees in their company
+        console.log('🔍 getEmployees - HR user, filtering by company_id:', currentUser.company_id);
+        query = query.eq('company_id', currentUser.company_id);
+        break;
+        
+      case 'team_lead':
+        // Team Lead can see their team members
+        console.log('🔍 getEmployees - Team Lead, filtering by team_lead_id:', currentUser.id);
+        query = query.eq('team_lead_id', currentUser.id);
+        break;
+        
+      case 'employee':
+        // Employee can only see their own data
+        console.log('🔍 getEmployees - Employee, filtering by user_id:', currentUser.id);
+        query = query.eq('user_id', currentUser.id);
+        break;
+        
+      default:
+        return res.status(403).json({ error: 'Access denied' });
     }
 
-    res.json({ employees });
+    const { data: employees, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get employees error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log('🔍 getEmployees - Found employees:', employees?.length || 0);
+    if (employees && employees.length > 0) {
+      employees.forEach(emp => {
+        console.log(`  - ${emp.full_name} (${emp.email}) - Company: ${emp.company_id}`);
+      });
+    }
+
+    // Transform the data to include user information
+    const transformedEmployees = employees.map(emp => ({
+      ...emp,
+      user: emp.users,
+      team_lead_info: emp.team_lead,
+      creator_info: emp.creator,
+      // Remove the nested objects to avoid duplication
+      users: undefined,
+      team_lead: undefined,
+      creator: undefined
+    }));
+
+    res.json({ 
+      employees: transformedEmployees,
+      total: transformedEmployees.length,
+      user_role: currentUser.role,
+      company_id: currentUser.company_id
+    });
   } catch (error) {
     console.error('Get employees error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -191,14 +292,39 @@ const getEmployees = async (req, res) => {
 const getEmployee = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUser = req.user;
 
-    const { data: employee, error } = await supabase
+    // Build query with role-based access
+    let query = supabaseAdmin
       .from('employees')
-      .select('id, user_id, employee_id, full_name, email, department, designation, salary, joining_date, phone_number, address, emergency_contact, pan_number, bank_account, leave_balance, role, company_id, created_at, updated_at')
-      .eq('id', id)
-      .eq('company_id', req.user.company_id)
-      .eq('role', 'employee')
-      .single();
+      .select(`
+        *,
+        users!inner(full_name, email, role, company_id),
+        team_lead:users!employees_team_lead_id_fkey(full_name, email)
+      `)
+      .eq('id', id);
+
+    // Apply role-based filtering
+    if (currentUser.role === 'hr') {
+      // HR can only see employees they created
+      query = query.eq('created_by', currentUser.id);
+    } else if (currentUser.role === 'hr_manager') {
+      // HR Manager can see all employees in their company
+      query = query.eq('users.company_id', currentUser.company_id);
+    } else if (currentUser.role === 'team_lead') {
+      // Team Lead can see their team members
+      query = query.eq('team_lead_id', currentUser.id);
+    } else if (currentUser.role === 'admin') {
+      // Admin can see all employees
+      // No additional filter needed
+    } else if (currentUser.role === 'employee') {
+      // Employee can only see their own data
+      query = query.eq('user_id', currentUser.id);
+    } else {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { data: employee, error } = await query.single();
 
     if (error || !employee) {
       return res.status(404).json({ error: 'Employee not found' });
@@ -215,6 +341,7 @@ const getEmployee = async (req, res) => {
 const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUser = req.user;
     const { 
       full_name, 
       email, 
@@ -237,21 +364,33 @@ const updateEmployee = async (req, res) => {
       });
     }
 
-    // Check if employee exists and belongs to HR's company
-    const { data: existingEmployee, error: checkError } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('id', id)
-      .eq('company_id', req.user.company_id)
-      .eq('role', 'employee')
-      .single();
-
-    if (checkError || !existingEmployee) {
-      return res.status(404).json({ error: 'Employee not found' });
+    // Check if user has permission to update employees
+    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Update employee
-    const { data: employee, error } = await supabase
+    // Check if employee exists and user has access
+    let query = supabaseAdmin
+      .from('employees')
+      .select('id, created_by, company_id')
+      .eq('id', id);
+
+    // Apply role-based filtering for access check
+    if (currentUser.role === 'hr') {
+      query = query.eq('created_by', currentUser.id);
+    } else if (currentUser.role === 'hr_manager') {
+      query = query.eq('company_id', currentUser.company_id);
+    }
+    // Admin can access all employees, no additional filter needed
+
+    const { data: existingEmployee, error: checkError } = await query.single();
+
+    if (checkError || !existingEmployee) {
+      return res.status(404).json({ error: 'Employee not found or access denied' });
+    }
+
+    // Update employee using admin client to bypass RLS
+    const { data: employee, error } = await supabaseAdmin
       .from('employees')
       .update({ 
         full_name, 
@@ -268,7 +407,7 @@ const updateEmployee = async (req, res) => {
         leave_balance: parseInt(leave_balance) || 20
       })
       .eq('id', id)
-      .select('id, user_id, employee_id, full_name, email, department, designation, salary, joining_date, phone_number, address, emergency_contact, pan_number, bank_account, leave_balance, role, company_id, created_at, updated_at')
+      .select('*')
       .single();
 
     if (error) {
@@ -286,22 +425,35 @@ const updateEmployee = async (req, res) => {
   }
 };
 
-// Delete employee (HR only)
+// Delete employee (Admin/HR Manager/HR only)
 const deleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUser = req.user;
 
-    // Check if employee exists and belongs to HR's company
-    const { data: existingEmployee, error: checkError } = await supabase
+    // Check if user has permission to delete employees
+    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if employee exists and user has access
+    let query = supabaseAdmin
       .from('employees')
-      .select('id, user_id')
-      .eq('id', id)
-      .eq('company_id', req.user.company_id)
-      .eq('role', 'employee')
-      .single();
+      .select('id, user_id, created_by, company_id')
+      .eq('id', id);
+
+    // Apply role-based filtering for access check
+    if (currentUser.role === 'hr') {
+      query = query.eq('created_by', currentUser.id);
+    } else if (currentUser.role === 'hr_manager') {
+      query = query.eq('company_id', currentUser.company_id);
+    }
+    // Admin can access all employees, no additional filter needed
+
+    const { data: existingEmployee, error: checkError } = await query.single();
 
     if (checkError || !existingEmployee) {
-      return res.status(404).json({ error: 'Employee not found' });
+      return res.status(404).json({ error: 'Employee not found or access denied' });
     }
 
     // Delete from employees table
@@ -331,22 +483,35 @@ const deleteEmployee = async (req, res) => {
   }
 };
 
-// Reset employee password (HR only)
+// Reset employee password (Admin/HR Manager/HR only)
 const resetEmployeePassword = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUser = req.user;
 
-    // Check if employee exists and belongs to HR's company
-    const { data: existingEmployee, error: checkError } = await supabase
+    // Check if user has permission to reset employee passwords
+    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if employee exists and user has access
+    let query = supabaseAdmin
       .from('employees')
-      .select('id, user_id, email')
-      .eq('id', id)
-      .eq('company_id', req.user.company_id)
-      .eq('role', 'employee')
-      .single();
+      .select('id, user_id, email, created_by, company_id')
+      .eq('id', id);
+
+    // Apply role-based filtering for access check
+    if (currentUser.role === 'hr') {
+      query = query.eq('created_by', currentUser.id);
+    } else if (currentUser.role === 'hr_manager') {
+      query = query.eq('company_id', currentUser.company_id);
+    }
+    // Admin can access all employees, no additional filter needed
+
+    const { data: existingEmployee, error: checkError } = await query.single();
 
     if (checkError || !existingEmployee) {
-      return res.status(404).json({ error: 'Employee not found' });
+      return res.status(404).json({ error: 'Employee not found or access denied' });
     }
 
     // Generate new password
@@ -361,15 +526,8 @@ const resetEmployeePassword = async (req, res) => {
       return res.status(500).json({ error: 'Failed to reset password' });
     }
 
-    // Update password in our employees table
-    const { error: updateError } = await supabase
-      .from('employees')
-      .update({ password: newPassword })
-      .eq('id', id);
-
-    if (updateError) {
-      return res.status(500).json({ error: 'Failed to update password in database' });
-    }
+    // Password is stored in Supabase Auth, not in employees table
+    // No need to update employees table
 
     res.json({ 
       message: 'Employee password reset successfully',
@@ -385,42 +543,40 @@ const resetEmployeePassword = async (req, res) => {
 // Get company profile (accessible by all authenticated users)
 const getCompanyProfile = async (req, res) => {
   try {
-    let { data: company, error } = await supabase
+    console.log('🔍 getCompanyProfile - User company_id:', req.user.company_id);
+    
+    let { data: company, error } = await supabaseAdmin
       .from('companies')
       .select('*')
       .eq('id', req.user.company_id)
       .single();
 
+    console.log('🔍 getCompanyProfile - Query result:', company ? 'Found' : 'Not found', error?.message);
+
     if (error || !company) {
-      // If company doesn't exist and user is HR, create a default company profile
-      if (req.user.role === 'hr') {
-        const { data: newCompany, error: createError } = await supabase
-          .from('companies')
-          .insert({
-            id: req.user.company_id,
-            name: 'Your Company Name',
-            description: '',
-            industry: '',
-            founded_year: null,
-            website: '',
-            phone: '',
-            address: '',
-            email: '',
-            mission: '',
-            vision: '',
-            values: ''
-          })
-          .select('*')
-          .single();
+      console.log('🔍 getCompanyProfile - Company not found, creating default...');
+      
+      // Create a default company profile
+      const { data: newCompany, error: createError } = await supabaseAdmin
+        .from('companies')
+        .insert([{
+          id: req.user.company_id,
+          name: 'Your Company Name',
+          email: 'contact@company.com',
+          address: 'Company Address',
+          phone: '+1234567890',
+          website: 'https://company.com'
+        }])
+        .select('*')
+        .single();
 
-        if (createError) {
-          return res.status(500).json({ error: 'Failed to create company profile' });
-        }
-
-        company = newCompany;
-      } else {
-        return res.status(404).json({ error: 'Company not found' });
+      if (createError) {
+        console.error('🔍 getCompanyProfile - Error creating company:', createError);
+        return res.status(500).json({ error: 'Failed to create company profile' });
       }
+
+      company = newCompany;
+      console.log('🔍 getCompanyProfile - Default company created');
     }
 
     res.json({ company });
@@ -493,14 +649,24 @@ const updateCompanyProfile = async (req, res) => {
 // Get employees for viewing (accessible by all authenticated users)
 const getEmployeesForViewing = async (req, res) => {
   try {
+    console.log('🔍 getEmployeesForViewing - User:', req.user.full_name, 'Company ID:', req.user.company_id);
+    
     const { data: employees, error } = await supabase
       .from('employees')
-      .select('id, user_id, employee_id, full_name, email, department, designation, phone_number, joining_date, role, company_id, created_at')
+      .select('id, user_id, employee_id, full_name, email, department, designation, phone_number, joining_date, company_id, created_at')
       .eq('company_id', req.user.company_id)
       .order('full_name', { ascending: true });
 
     if (error) {
+      console.error('🔍 getEmployeesForViewing - Error:', error);
       return res.status(500).json({ error: 'Failed to fetch employees' });
+    }
+
+    console.log('🔍 getEmployeesForViewing - Found employees:', employees?.length || 0);
+    if (employees && employees.length > 0) {
+      employees.forEach(emp => {
+        console.log(`  - ${emp.full_name} (${emp.email}) - Company: ${emp.company_id}`);
+      });
     }
 
     res.json({ employees });

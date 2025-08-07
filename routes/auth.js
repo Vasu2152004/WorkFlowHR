@@ -1,38 +1,49 @@
 const express = require('express');
-const { body } = require('express-validator');
+const { body, validationResult } = require('express-validator');
+const authController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
-const {
-  hrSignup,
-  login,
-  logout,
-  getProfile,
-  refreshToken
-} = require('../controllers/authController');
 
 const router = express.Router();
 
+// Validation error handler middleware
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ 
+      error: errors.array()[0].msg || 'Validation failed',
+      details: errors.array()
+    });
+  }
+  next();
+};
+
 // Validation middleware
-const validateSignup = [
-  body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }),
-  body('full_name').trim().isLength({ min: 2 }),
-  body('company_name').trim().isLength({ min: 2 })
+const validateAdminSignup = [
+  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('full_name').trim().isLength({ min: 2 }).withMessage('Full name is required'),
+  body('company_name').trim().isLength({ min: 2 }).withMessage('Company name is required'),
+  handleValidationErrors
 ];
 
-const validateLogin = [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty()
+const validateAddUser = [
+  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('full_name').trim().isLength({ min: 2 }).withMessage('Full name is required'),
+  handleValidationErrors
 ];
 
-const validateRefreshToken = [
-  body('refresh_token').notEmpty()
-];
+// Public routes
+router.post('/signup', validateAdminSignup, authController.adminSignup);
+router.post('/login', authController.login);
+router.post('/logout', authController.logout);
+router.post('/refresh-token', authController.refreshToken);
 
-// Routes
-router.post('/signup', validateSignup, hrSignup);
-router.post('/login', validateLogin, login);
-router.post('/logout', logout);
-router.get('/profile', authenticateToken, getProfile);
-router.post('/refresh', validateRefreshToken, refreshToken);
+// Protected routes
+router.get('/profile', authenticateToken, authController.getProfile);
+
+// Admin routes
+router.post('/add-hr-manager', authenticateToken, validateAddUser, authController.addHRManager);
+router.post('/add-hr-staff', authenticateToken, validateAddUser, authController.addHRStaff);
 
 module.exports = router; 

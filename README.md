@@ -1,247 +1,213 @@
-# HRMS Backend
+# HRMS (Human Resource Management System)
 
-A Human Resource Management System backend built with Node.js, Express, and Supabase.
+A comprehensive Human Resource Management System built with Node.js, Express.js, React.js, and Supabase. This system provides complete HR functionality with multi-tenant architecture, role-based access control, and automated email notifications.
 
 ## 🚀 Features
 
-- **Secure Authentication**: Supabase Auth integration with JWT tokens
-- **Role-Based Access Control**: HR and Employee roles with proper permissions
-- **Multi-Tenant Architecture**: Company-based data isolation
-- **Row-Level Security**: Database-level security with RLS policies
-- **Employee Management**: HR can add, update, delete, and manage employees
-- **Password Management**: Auto-generated secure passwords for employees
-- **API Security**: Rate limiting, CORS, and input validation
+### Core HR Features
+- **Employee Management**: Add, view, and manage employee profiles
+- **Leave Management**: Request, approve, and track leave with automatic balance deduction
+- **Salary Management**: Generate salary slips with automatic deductions for unpaid leaves
+- **Document Management**: Create and manage HR documents with rich text editor
+- **Company Isolation**: Multi-tenant architecture ensuring data security
+
+### User Roles & Access Control
+- **Admin**: Full system access, company management
+- **HR Manager**: Employee management, leave approvals, salary generation
+- **HR Specialist**: Basic HR operations
+- **Employee**: Self-service portal for leave requests and salary slips
+
+### Advanced Features
+- **Email Notifications**: Automated emails for leave requests, approvals, and salary slips
+- **Leave Balance Tracking**: Automatic deduction of leave balance for approved paid leaves
+- **Salary Deductions**: Automatic calculation of unpaid leave deductions
+- **Responsive UI**: Modern card-based interface with dark/light theme support
+
+## 🛠️ Tech Stack
+
+### Backend
+- **Node.js** - Runtime environment
+- **Express.js** - Web framework
+- **Supabase** - Database and authentication
+- **JWT** - Authentication tokens
+- **Nodemailer** - Email notifications
+
+### Frontend
+- **React.js** - UI framework
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **Lucide React** - Icons
+- **React Hot Toast** - Notifications
+
+### Database
+- **PostgreSQL** (via Supabase)
+- **Row Level Security (RLS)** - Data isolation
+- **Real-time subscriptions**
 
 ## 📋 Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js (v16 or higher)
 - npm or yarn
-- Supabase account and project
+- Supabase account
+- Gmail account (for email notifications)
 
-## 🛠 Setup Instructions
+## 🚀 Installation
 
-### 1. Clone and Install Dependencies
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd HRMS
+   ```
 
-```bash
-npm install
+2. **Install dependencies**
+   ```bash
+   # Install backend dependencies
+   npm install
+
+   # Install frontend dependencies
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+3. **Environment Setup**
+   ```bash
+   # Copy environment template
+   cp env.example .env
+   ```
+
+4. **Configure Environment Variables**
+   ```env
+   # Supabase Configuration
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+   # JWT Configuration
+   JWT_SECRET=your_jwt_secret
+
+   # Email Configuration (Gmail)
+   EMAIL_USER=your_gmail@gmail.com
+   EMAIL_PASS=your_gmail_app_password
+   ```
+
+5. **Database Setup**
+   - Create a Supabase project
+   - Run the SQL scripts in the `database/` folder
+   - Configure Row Level Security policies
+
+6. **Start the application**
+   ```bash
+   # Start backend server
+   npm start
+
+   # Start frontend (in another terminal)
+   cd frontend
+   npm run dev
+   ```
+
+## 📁 Project Structure
+
+```
+HRMS/
+├── config/                 # Supabase configuration
+├── controllers/            # API controllers
+├── database/              # SQL scripts and migrations
+├── frontend/              # React frontend application
+├── middleware/            # Authentication middleware
+├── routes/               # API routes
+├── utils/                # Utility functions
+├── server.js             # Main server file
+└── package.json          # Backend dependencies
 ```
 
-### 2. Supabase Setup
+## 🔧 Configuration
 
-1. Create a new Supabase project at [supabase.com](https://supabase.com)
-2. Get your project URL and API keys from the project settings
-3. Run the SQL schema in your Supabase SQL editor:
+### Supabase Setup
+1. Create a new Supabase project
+2. Get your project URL and API keys
+3. Run the database migration scripts
+4. Configure RLS policies for data isolation
 
-```sql
--- Copy and paste the contents of database/schema.sql
-```
+### Email Configuration
+1. Enable 2-Factor Authentication on your Gmail account
+2. Generate an App Password
+3. Add the credentials to your `.env` file
 
-### 3. Environment Configuration
+## 🎯 Key Features Explained
 
-1. Copy the environment example file:
-```bash
-cp env.example .env
-```
+### Multi-Tenant Architecture
+- Each company has isolated data
+- Users can only access their company's information
+- Automatic company assignment on signup
 
-2. Update `.env` with your Supabase credentials:
-```env
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-PORT=3000
-NODE_ENV=development
-JWT_SECRET=your_jwt_secret_key_here
-```
+### Leave Management
+- **Leave Types**: Annual, Sick, Personal, and custom types
+- **Balance Tracking**: Automatic deduction for paid leaves
+- **Approval Workflow**: HR approval with email notifications
+- **Working Days Calculation**: Excludes weekends automatically
 
-### 4. Supabase Auth Settings
+### Salary Management
+- **Automatic Deductions**: Unpaid leave days are deducted from salary
+- **Salary Slips**: PDF generation with detailed breakdown
+- **Email Notifications**: Employees receive salary slip notifications
 
-In your Supabase dashboard:
-1. Go to Authentication > Settings
-2. Disable "Enable email confirmations"
-3. Disable "Enable sign up" (only HR can sign up via API)
+### Email Notifications
+- **Leave Requests**: HR receives notifications for new requests
+- **Leave Approvals**: Employees receive approval/rejection emails
+- **Salary Slips**: Employees notified when salary slips are generated
 
-### 5. Start the Server
+## 🔒 Security Features
 
-```bash
-# Development mode
-npm run dev
+- **JWT Authentication**: Secure token-based authentication
+- **Role-Based Access Control**: Different permissions for different roles
+- **Company Isolation**: Data separation between companies
+- **Input Validation**: Server-side validation for all inputs
+- **SQL Injection Protection**: Parameterized queries
 
-# Production mode
-npm start
-```
+## 📧 Email Templates
 
-The server will start on `http://localhost:3000`
-
-## 📚 API Documentation
-
-### Authentication Endpoints
-
-#### HR Signup
-```http
-POST /api/auth/signup
-Content-Type: application/json
-
-{
-  "email": "hr@company.com",
-  "password": "securepassword",
-  "full_name": "John Doe",
-  "company_name": "Acme Corp"
-}
-```
-
-#### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@company.com",
-  "password": "password"
-}
-```
-
-#### Get Profile
-```http
-GET /api/auth/profile
-Authorization: Bearer <access_token>
-```
-
-#### Refresh Token
-```http
-POST /api/auth/refresh
-Content-Type: application/json
-
-{
-  "refresh_token": "<refresh_token>"
-}
-```
-
-### User Management Endpoints (HR Only)
-
-#### Add Employee
-```http
-POST /api/users/employees
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "email": "employee@company.com",
-  "full_name": "Jane Smith"
-}
-```
-
-#### Get All Employees
-```http
-GET /api/users/employees
-Authorization: Bearer <access_token>
-```
-
-#### Get Employee by ID
-```http
-GET /api/users/employees/:id
-Authorization: Bearer <access_token>
-```
-
-#### Update Employee
-```http
-PUT /api/users/employees/:id
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "email": "updated@company.com",
-  "full_name": "Updated Name"
-}
-```
-
-#### Delete Employee
-```http
-DELETE /api/users/employees/:id
-Authorization: Bearer <access_token>
-```
-
-#### Reset Employee Password
-```http
-POST /api/users/employees/:id/reset-password
-Authorization: Bearer <access_token>
-```
-
-## 🔐 Security Features
-
-### Row-Level Security (RLS)
-- Users can only access data from their own company
-- Automatic data isolation between companies
-- Database-level security policies
-
-### Authentication Flow
-1. **HR Signup**: Only HR users can sign up via API
-2. **Employee Creation**: HR creates employees with auto-generated passwords
-3. **Login**: Both HR and employees can login with their credentials
-4. **Token Management**: JWT tokens with refresh capability
-
-### API Security
-- Rate limiting to prevent abuse
-- Input validation and sanitization
-- CORS configuration
-- Helmet security headers
-
-## 🏗 Database Schema
-
-### Users Table
-```sql
-- id (UUID) - Primary key, matches Supabase Auth user ID
-- full_name (TEXT) - User's full name
-- email (TEXT) - User's email address
-- password (TEXT) - Auto-generated password for employees
-- role (ENUM) - 'hr' or 'employee'
-- company_id (UUID) - Foreign key to companies table
-- created_at (TIMESTAMP) - Creation timestamp
-- updated_at (TIMESTAMP) - Last update timestamp
-```
-
-### Companies Table
-```sql
-- id (UUID) - Primary key
-- name (TEXT) - Company name
-- created_at (TIMESTAMP) - Creation timestamp
-- updated_at (TIMESTAMP) - Last update timestamp
-```
+The system includes professional HTML email templates for:
+- Leave request notifications
+- Leave approval/rejection updates
+- Salary slip generation notifications
 
 ## 🚀 Deployment
 
-### Environment Variables for Production
-```env
-NODE_ENV=production
-SUPABASE_URL=your_production_supabase_url
-SUPABASE_ANON_KEY=your_production_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_production_service_role_key
-JWT_SECRET=your_secure_jwt_secret
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-```
+### Backend Deployment
+1. Set up environment variables
+2. Install dependencies: `npm install`
+3. Start the server: `npm start`
 
-### PM2 Deployment
-```bash
-npm install -g pm2
-pm2 start server.js --name "hrms-backend"
-pm2 save
-pm2 startup
-```
-
-## 🧪 Testing
-
-```bash
-npm test
-```
-
-## 📝 License
-
-MIT License
+### Frontend Deployment
+1. Build the application: `npm run build`
+2. Deploy the `dist` folder to your hosting service
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request 
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+For support and questions:
+- Create an issue in the repository
+- Check the documentation
+- Review the code comments
+
+## 🔄 Version History
+
+- **v1.0.0**: Initial release with core HR features
+- **v1.1.0**: Added email notifications and leave balance tracking
+- **v1.2.0**: Enhanced UI with card-based design and dark theme
+
+---
+
+**Built with ❤️ using modern web technologies**

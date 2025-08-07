@@ -10,6 +10,9 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const documentRoutes = require('./routes/documents');
 const leaveRoutes = require('./routes/leaves');
+const teamLeadRoutes = require('./routes/teamLead');
+const hrManagerRoutes = require('./routes/hrManager');
+const salaryRoutes = require('./routes/salary');
 
 // Optional email routes
 let emailRoutes = null;
@@ -25,12 +28,14 @@ const PORT = process.env.PORT || 3000;
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
+// CORS configuration - Allow both frontend ports
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://your-frontend-domain.com'] 
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
-  credentials: true
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Rate limiting
@@ -52,7 +57,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT
   });
 });
 
@@ -61,6 +67,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/leaves', leaveRoutes);
+app.use('/api/team-lead', teamLeadRoutes);
+app.use('/api/hr-manager', hrManagerRoutes);
+app.use('/api/salary', salaryRoutes);
 if (emailRoutes) {
   app.use('/api', emailRoutes);
 }
@@ -97,6 +106,8 @@ app.use((error, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 HRMS System running on http://localhost:${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 // Graceful shutdown
