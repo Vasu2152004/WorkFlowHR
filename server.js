@@ -1,151 +1,135 @@
 const express = require('express')
 const cors = require('cors')
-const helmet = require('helmet')
-const rateLimit = require('express-rate-limit')
 const path = require('path')
 require('dotenv').config()
-
-// Import routes
-const authRoutes = require('./routes/auth')
-const userRoutes = require('./routes/users')
-const documentRoutes = require('./routes/documents')
-const leaveRoutes = require('./routes/leaves')
-const teamLeadRoutes = require('./routes/teamLead')
-const hrManagerRoutes = require('./routes/hrManager')
-const salaryRoutes = require('./routes/salary')
-const workingDaysRoutes = require('./routes/workingDays')
-const companyCalendarRoutes = require('./routes/companyCalendar')
-
-// Optional email routes
-let emailRoutes = null
-try {
-  emailRoutes = require('./routes/email')
-} catch (error) {
-  // Email routes not available - email functionality disabled
-}
 
 const app = express()
 const PORT = process.env.PORT || 3000
 const NODE_ENV = process.env.NODE_ENV || 'development'
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https://api.supabase.co"]
-    }
-  },
-  crossOriginEmbedderPolicy: false
-}))
+// Basic middleware
+app.use(cors())
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// CORS configuration
-const corsOptions = {
-  origin: NODE_ENV === 'production' 
-    ? [process.env.CORS_ORIGIN || 'https://your-frontend-domain.com']
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5173'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}
-app.use(cors(corsOptions))
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    error: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Skip rate limiting for health checks
-    return req.path === '/health'
-  }
-})
-app.use(limiter)
-
-// Body parsing middleware
-app.use(express.json({ 
-  limit: process.env.MAX_FILE_SIZE || '10mb'
-}))
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: process.env.MAX_FILE_SIZE || '10mb' 
-}))
-
-// Request logging middleware
-app.use((req, res, next) => {
-  const start = Date.now()
-  res.on('finish', () => {
-    const duration = Date.now() - start
-    const logMessage = `${new Date().toISOString()} - ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`
-    
-    if (res.statusCode >= 400) {
-      console.error(logMessage)
-    } else {
-      console.log(logMessage)
-    }
-  })
-  next()
-})
-
-// Health check endpoint
+// Health check endpoint (always available)
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: NODE_ENV,
-    version: process.env.npm_package_version || '1.0.0'
+    version: '1.0.0'
   })
 })
 
-// API routes
-app.use('/api/auth', authRoutes)
-app.use('/api/users', userRoutes)
-app.use('/api/documents', documentRoutes)
-app.use('/api/leaves', leaveRoutes)
-app.use('/api/team-lead', teamLeadRoutes)
-app.use('/api/hr-manager', hrManagerRoutes)
-app.use('/api/salary', salaryRoutes)
-app.use('/api/working-days', workingDaysRoutes)
-app.use('/api/company-calendar', companyCalendarRoutes)
+// Test endpoint for debugging
+app.get('/test', (req, res) => {
+  res.json({
+    message: 'Test endpoint working',
+    environment: NODE_ENV,
+    timestamp: new Date().toISOString(),
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      SUPABASE_URL: process.env.SUPABASE_URL ? 'Set' : 'Not set',
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? 'Set' : 'Not set',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set'
+    }
+  })
+})
 
-// Email routes (if available)
-if (emailRoutes) {
+// Try to import and use routes with error handling
+try {
+  // Import routes with error handling
+  const authRoutes = require('./routes/auth')
+  const userRoutes = require('./routes/users')
+  const documentRoutes = require('./routes/documents')
+  const leaveRoutes = require('./routes/leaves')
+  const teamLeadRoutes = require('./routes/teamLead')
+  const hrManagerRoutes = require('./routes/hrManager')
+  const salaryRoutes = require('./routes/salary')
+  const workingDaysRoutes = require('./routes/workingDays')
+  const companyCalendarRoutes = require('./routes/companyCalendar')
+
+  // API routes
+  app.use('/api/auth', authRoutes)
+  app.use('/api/users', userRoutes)
+  app.use('/api/documents', documentRoutes)
+  app.use('/api/leaves', leaveRoutes)
+  app.use('/api/team-lead', teamLeadRoutes)
+  app.use('/api/hr-manager', hrManagerRoutes)
+  app.use('/api/salary', salaryRoutes)
+  app.use('/api/working-days', workingDaysRoutes)
+  app.use('/api/company-calendar', companyCalendarRoutes)
+
+  console.log('✅ All routes loaded successfully')
+} catch (error) {
+  console.error('❌ Error loading routes:', error.message)
+  
+  // Fallback route for when routes fail to load
+  app.use('/api/*', (req, res) => {
+    res.status(500).json({ 
+      error: 'Routes not available',
+      message: 'Some routes failed to load. Please check environment variables and configuration.',
+      availableEndpoints: ['/health', '/test']
+    })
+  })
+}
+
+// Optional email routes
+try {
+  const emailRoutes = require('./routes/email')
   app.use('/api/email', emailRoutes)
+  console.log('✅ Email routes loaded successfully')
+} catch (error) {
+  console.log('⚠️ Email routes not available:', error.message)
 }
 
 // Serve static files from the React app (if available)
-const frontendPath = path.join(__dirname, 'frontend/dist')
-if (require('fs').existsSync(frontendPath)) {
-  app.use(express.static(frontendPath, {
-    maxAge: NODE_ENV === 'production' ? '1y' : '0'
-  }))
+try {
+  const frontendPath = path.join(__dirname, 'frontend/dist')
+  if (require('fs').existsSync(frontendPath)) {
+    app.use(express.static(frontendPath))
+    
+    // Catch all handler: send back React's index.html file for any non-API routes
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(frontendPath, 'index.html'))
+    })
+    console.log('✅ Frontend static files served')
+  } else {
+    // If no frontend build, just return API info
+    app.get('/', (req, res) => {
+      res.json({
+        message: 'WorkFlowHR API Server',
+        version: '1.0.0',
+        status: 'running',
+        endpoints: {
+          health: '/health',
+          test: '/test',
+          auth: '/api/auth',
+          users: '/api/users',
+          leaves: '/api/leaves',
+          documents: '/api/documents',
+          salary: '/api/salary'
+        }
+      })
+    })
+    console.log('✅ API-only mode - no frontend build found')
+  }
+} catch (error) {
+  console.error('❌ Error serving static files:', error.message)
   
-  // Catch all handler: send back React's index.html file for any non-API routes
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'))
-  })
-} else {
-  // If no frontend build, just return API info
+  // Fallback for static file serving
   app.get('/', (req, res) => {
     res.json({
       message: 'WorkFlowHR API Server',
       version: '1.0.0',
+      status: 'running (fallback mode)',
+      error: 'Static file serving failed',
       endpoints: {
         health: '/health',
-        auth: '/api/auth',
-        users: '/api/users',
-        leaves: '/api/leaves',
-        documents: '/api/documents',
-        salary: '/api/salary'
+        test: '/test'
       }
     })
   })
@@ -153,29 +137,8 @@ if (require('fs').existsSync(frontendPath)) {
 
 // Global error handler
 app.use((error, req, res, next) => {
-  // Handle validation errors
-  if (error.type === 'entity.parse.failed') {
-    return res.status(400).json({ error: 'Invalid JSON payload' })
-  }
-  
-  // Handle rate limit errors
-  if (error.status === 429) {
-    return res.status(429).json({ error: 'Too many requests' })
-  }
-  
-  // Handle JWT errors
-  if (error.name === 'JsonWebTokenError') {
-    return res.status(401).json({ error: 'Invalid token' })
-  }
-  
-  if (error.name === 'TokenExpiredError') {
-    return res.status(401).json({ error: 'Token expired' })
-  }
-  
-  // Log the error
   console.error('Unhandled error:', error)
   
-  // Send error response
   const statusCode = error.statusCode || 500
   const message = NODE_ENV === 'production' 
     ? 'Internal server error' 
@@ -192,10 +155,13 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' })
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 WorkFlowHR server running on port ${PORT} in ${NODE_ENV} mode`)
-  console.log(`📊 Health check available at: http://localhost:${PORT}/health`)
-  console.log(`🔗 API base URL: http://localhost:${PORT}/api`)
-})
+// Only start the server if we're not in a serverless environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 WorkFlowHR server running on port ${PORT} in ${NODE_ENV} mode`)
+    console.log(`📊 Health check available at: http://localhost:${PORT}/health`)
+    console.log(`🔗 API base URL: http://localhost:${PORT}/api`)
+  })
+}
 
 module.exports = app 

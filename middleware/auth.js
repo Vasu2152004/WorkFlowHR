@@ -20,6 +20,13 @@ const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
   try {
+    // Check if Supabase is configured
+    if (!supabase || !supabaseAdmin) {
+      return res.status(503).json({ 
+        error: 'Database not configured. Please check environment variables.' 
+      });
+    }
+
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
