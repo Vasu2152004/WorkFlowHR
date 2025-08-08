@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer')
 const { supabase, supabaseAdmin } = require('../config/supabase')
+const { generateSalarySlipPDF } = require('./salarySlipPDF')
 
 // Email configuration
 let transporter = null
@@ -166,7 +167,10 @@ const emailTemplates = {
       
       <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-top: 20px;">
         <p style="margin: 0; color: #1e40af;">
-          <strong>Access Your Salary Slip:</strong> You can view and download your complete salary slip from your employee dashboard in the HRMS system.
+          <strong>📎 PDF Attachment:</strong> Your complete salary slip has been attached to this email as a PDF document.
+        </p>
+        <p style="margin: 10px 0 0 0; color: #1e40af;">
+          <strong>Access Your Salary Slip:</strong> You can also view and download your salary slip from your employee dashboard in the HRMS system.
         </p>
       </div>
       
@@ -269,8 +273,8 @@ const emailService = {
     }
   },
 
-  // Send email notification for salary slip generation
-  async sendSalarySlipNotification(salarySlip, employee) {
+  // Send email notification for salary slip generation with PDF attachment
+  async sendSalarySlipNotification(salarySlip, employee, details = []) {
     if (!transporter) {
       console.log('⚠️ Email service not configured - skipping salary slip notification')
       return false
@@ -286,15 +290,37 @@ const emailService = {
         salarySlip.total_deductions
       )
 
+      // Generate PDF attachment
+      let attachments = []
+      try {
+        const pdfBuffer = await generateSalarySlipPDF(salarySlip, employee, details)
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ]
+        const monthName = monthNames[salarySlip.month - 1]
+        const year = salarySlip.year
+        
+        attachments.push({
+          filename: `salary_slip_${employee.full_name.replace(/\s+/g, '_')}_${monthName}_${year}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        })
+      } catch (pdfError) {
+        console.error('❌ Failed to generate PDF attachment:', pdfError)
+        // Continue without PDF attachment if generation fails
+      }
+
       const mailOptions = {
         from: process.env.EMAIL_USER || 'your-email@gmail.com',
         to: employee.email,
         subject: `Salary Slip Generated - ${new Date(salarySlip.year, salarySlip.month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
-        html: html
+        html: html,
+        attachments: attachments
       }
 
       const info = await transporter.sendMail(mailOptions)
-      console.log('✅ Salary slip notification sent:', info.messageId)
+      console.log('✅ Salary slip notification sent with PDF attachment:', info.messageId)
       return true
     } catch (error) {
       console.error('❌ Failed to send salary slip notification:', error)

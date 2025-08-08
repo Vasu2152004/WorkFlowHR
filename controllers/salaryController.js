@@ -1,5 +1,11 @@
 const { supabase, supabaseAdmin } = require('../config/supabase')
 const emailService = require('../utils/emailService')
+const { 
+  calculateWorkingDaysInMonth, 
+  calculateDailySalary, 
+  calculateWorkingDaysBetween,
+  calculateLeaveDays
+} = require('../utils/workingDaysCalculator')
 
 // Get all salary components (additions/deductions)
 const getSalaryComponents = async (req, res) => {
@@ -112,10 +118,10 @@ const getEmployeeFixedDeductions = async (employeeId) => {
 // Calculate leave impact on salary
 const calculateLeaveImpact = async (employeeId, month, year) => {
   try {
-    // Get employee's annual salary
+    // Get employee's annual salary and company_id
     const { data: employee, error: empError } = await supabaseAdmin
       .from('employees')
-      .select('salary')
+      .select('salary, company_id')
       .eq('id', employeeId)
       .single();
 
@@ -173,22 +179,20 @@ const calculateLeaveImpact = async (employeeId, month, year) => {
     let unpaidLeaveDays = 0;
     
     if (leaves && leaves.length > 0) {
-      leaves.forEach(leave => {
+      for (const leave of leaves) {
         const start = new Date(leave.start_date);
         const end = new Date(leave.end_date);
         
         // Calculate working days between start and end dates for this month
-        let current = new Date(Math.max(start, startDate));
+        const monthStart = new Date(Math.max(start, startDate));
         const monthEnd = new Date(Math.min(end, endDate));
         
-        let leaveDaysInMonth = 0;
-        while (current <= monthEnd) {
-          // Skip weekends (0 = Sunday, 6 = Saturday)
-          if (current.getDay() !== 0 && current.getDay() !== 6) {
-            leaveDaysInMonth++;
-          }
-          current.setDate(current.getDate() + 1);
-        }
+        // Calculate leave days using the new utility function that respects working days
+        const leaveDaysInMonth = await calculateLeaveDays(
+          employee.company_id, 
+          monthStart, 
+          monthEnd
+        );
         
         totalLeaveDays += leaveDaysInMonth;
         
@@ -197,12 +201,11 @@ const calculateLeaveImpact = async (employeeId, month, year) => {
         if (isUnpaidLeave) {
           unpaidLeaveDays += leaveDaysInMonth;
         }
-      });
+      }
     }
 
-    // Calculate daily salary (assuming 22 working days per month)
-    const WORKING_DAYS_PER_MONTH = 22;
-    const dailySalary = employee.salary / (WORKING_DAYS_PER_MONTH * 12);
+    // Calculate daily salary using 30 days per month (as requested)
+    const dailySalary = calculateDailySalary(employee.salary, 30);
     const leaveDeduction = dailySalary * unpaidLeaveDays;
 
     // Update or insert leave salary impact
@@ -339,12 +342,17 @@ const generateSalarySlip = async (req, res) => {
       }
     }, 0);
 
-    // Calculate salary components
-    const WORKING_DAYS_PER_MONTH = 22;
-    const actualWorkingDays = WORKING_DAYS_PER_MONTH - leaveImpact.unpaidLeaves;
-    const dailySalary = employee.salary / (WORKING_DAYS_PER_MONTH * 12);
-    const grossSalary = dailySalary * actualWorkingDays;
-
+    // Calculate salary components using new working days calculation
+    const totalWorkingDaysInMonth = await calculateWorkingDaysInMonth(employee.company_id, month, year);
+    const actualWorkingDays = totalWorkingDaysInMonth - leaveImpact.unpaidLeaves;
+    
+    // Calculate daily salary using 30 days per month (as requested)
+    const dailySalary = calculateDailySalary(employee.salary, 30);
+    
+    // Calculate gross salary based on 30 days per month (monthly salary)
+    const monthlySalary = employee.salary / 12; // ₹30,000 for ₹360,000 annual salary
+    const grossSalary = monthlySalary; // Gross salary should be the monthly salary
+    
     // Process additions and deductions with proper validation
     const processedAdditions = additions.filter(item => 
       item.component_name && item.amount && parseFloat(item.amount) > 0
@@ -380,8 +388,8 @@ const generateSalarySlip = async (req, res) => {
         employee_id,
         month,
         year,
-        basic_salary: employee.salary,
-        total_working_days: WORKING_DAYS_PER_MONTH,
+        basic_salary: monthlySalary, // Store monthly basic salary
+        total_working_days: totalWorkingDaysInMonth,
         actual_working_days: actualWorkingDays,
         unpaid_leaves: leaveImpact.unpaidLeaves,
         gross_salary: grossSalary,
@@ -432,9 +440,19 @@ const generateSalarySlip = async (req, res) => {
       }
     }
 
-    // Send email notification to employee
+    // Send email notification to employee with PDF attachment
     try {
-      await emailService.sendSalarySlipNotification(salarySlip, employee)
+      // Get salary slip details for PDF generation
+      const { data: slipDetails, error: detailsError } = await supabaseAdmin
+        .from('salary_slip_details')
+        .select('*')
+        .eq('salary_slip_id', salarySlip.id)
+        .order('component_type', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      const details = detailsError ? [] : (slipDetails || []);
+      
+      await emailService.sendSalarySlipNotification(salarySlip, employee, details)
     } catch (emailError) {
       console.log('Email notification failed, but salary slip generated successfully:', emailError.message)
     }

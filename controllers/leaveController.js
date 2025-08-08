@@ -1,5 +1,6 @@
 const { supabase, supabaseAdmin } = require('../config/supabase')
 const emailService = require('../utils/emailService')
+const { calculateLeaveDays } = require('../utils/workingDaysCalculator')
 
 // Get leave types
 const getLeaveTypes = async (req, res) => {
@@ -196,9 +197,6 @@ const createLeaveRequest = async (req, res) => {
       })
     }
 
-    // Calculate total days (excluding weekends)
-    const totalDays = calculateWorkingDays(start, end)
-
     // Get employee details
     let employee = null
     if (['hr', 'hr_manager', 'admin'].includes(currentUser.role)) {
@@ -243,6 +241,9 @@ const createLeaveRequest = async (req, res) => {
     if (companyError || !employeeWithCompany) {
       return res.status(400).json({ error: 'Employee company not found' })
     }
+
+    // Calculate total days (respecting company working days configuration)
+    const totalDays = await calculateLeaveDays(employeeWithCompany.company_id, start, end)
 
     // Validate leave type exists using admin client to bypass RLS
     const { data: leaveType, error: leaveTypeError } = await supabaseAdmin
@@ -539,23 +540,6 @@ const getUnpaidLeaveDays = async (req, res) => {
     console.error('Get unpaid leave days error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
-}
-
-// Helper function to calculate working days (excluding weekends)
-const calculateWorkingDays = (startDate, endDate) => {
-  let workingDays = 0
-  const current = new Date(startDate)
-  const end = new Date(endDate)
-
-  while (current <= end) {
-    const dayOfWeek = current.getDay()
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday (0) or Saturday (6)
-      workingDays++
-    }
-    current.setDate(current.getDate() + 1)
-  }
-
-  return workingDays
 }
 
 module.exports = {

@@ -16,12 +16,14 @@ import {
   Lightbulb,
   Heart,
   ExternalLink,
-  Plus
+  Plus,
+  Clock,
+  Info
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
 const CompanyProfile = () => {
-  const { user } = useAuth()
+  const { user, API_BASE_URL } = useAuth()
   const [company, setCompany] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -38,6 +40,21 @@ const CompanyProfile = () => {
     vision: '',
     values: ''
   })
+  
+  // Working days configuration state
+  const [workingDaysConfig, setWorkingDaysConfig] = useState({
+    working_days_per_week: 5,
+    working_hours_per_day: 8.00,
+    monday_working: true,
+    tuesday_working: true,
+    wednesday_working: true,
+    thursday_working: true,
+    friday_working: true,
+    saturday_working: false,
+    sunday_working: false
+  })
+  const [isEditingWorkingDays, setIsEditingWorkingDays] = useState(false)
+  const [savingWorkingDays, setSavingWorkingDays] = useState(false)
 
   // Fetch company profile
   const fetchCompanyProfile = async () => {
@@ -86,8 +103,41 @@ const CompanyProfile = () => {
     }
   }
 
+  // Fetch working days configuration
+  const fetchWorkingDaysConfig = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error('Authentication token not found')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/working-days/config`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setWorkingDaysConfig(data.config)
+      } else {
+        const error = await response.json()
+        console.error('Failed to fetch working days config:', error.error)
+        // Don't show error toast for default config, just log it
+        if (response.status !== 404) {
+          toast.error(error.error || 'Failed to fetch working days configuration')
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching working days config:', error)
+      // Don't show error toast for network issues, just log it
+    }
+  }
+
   useEffect(() => {
     fetchCompanyProfile()
+    fetchWorkingDaysConfig()
   }, [])
 
   const handleEdit = () => {
@@ -151,6 +201,72 @@ const CompanyProfile = () => {
     }))
   }
 
+  // Working days configuration handlers
+  const handleWorkingDaysChange = (field, value) => {
+    setWorkingDaysConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleDayToggle = (day) => {
+    const newValue = !workingDaysConfig[day]
+    setWorkingDaysConfig(prev => ({
+      ...prev,
+      [day]: newValue
+    }))
+
+    // Update working days per week count
+    const workingDays = [
+      'monday_working',
+      'tuesday_working', 
+      'wednesday_working',
+      'thursday_working',
+      'friday_working',
+      'saturday_working',
+      'sunday_working'
+    ].filter(d => d === day ? newValue : workingDaysConfig[d]).length
+
+    setWorkingDaysConfig(prev => ({
+      ...prev,
+      working_days_per_week: workingDays
+    }))
+  }
+
+  const handleSaveWorkingDays = async () => {
+    setSavingWorkingDays(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        throw new Error('Authentication token not found')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/working-days/config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(workingDaysConfig)
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update working days configuration')
+      }
+
+      toast.success('Working days configuration updated successfully!')
+      setWorkingDaysConfig(result.config)
+      setIsEditingWorkingDays(false)
+    } catch (error) {
+      console.error('Error saving working days config:', error)
+      toast.error(error.message || 'Failed to update working days configuration')
+    } finally {
+      setSavingWorkingDays(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -167,12 +283,12 @@ const CompanyProfile = () => {
           Company Profile Not Found
         </h3>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          {user?.role === 'hr' 
+          {(user?.role === 'hr' || user?.role === 'hr_manager' || user?.role === 'admin')
             ? 'No company profile has been created yet. Create one to get started.'
             : 'Company profile has not been set up yet.'
           }
         </p>
-        {user?.role === 'hr' && (
+        {(user?.role === 'hr' || user?.role === 'hr_manager' || user?.role === 'admin') && (
           <button
             onClick={() => {
               setCompany({
@@ -220,10 +336,10 @@ const CompanyProfile = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Company Profile</h1>
           <p className="text-gray-600 dark:text-gray-300">
-            {user?.role === 'hr' ? 'Manage your company information' : 'Learn about your company'}
+            {(user?.role === 'hr' || user?.role === 'hr_manager' || user?.role === 'admin') ? 'Manage your company information' : 'Learn about your company'}
           </p>
         </div>
-        {user?.role === 'hr' && (
+        {(user?.role === 'hr' || user?.role === 'hr_manager' || user?.role === 'admin') && (
           <div className="flex space-x-3">
             {isEditing ? (
               <>
@@ -528,6 +644,141 @@ const CompanyProfile = () => {
           </div>
         </div>
       </div>
+
+      {/* Working Days Configuration */}
+      {(user?.role === 'hr' || user?.role === 'hr_manager' || user?.role === 'admin') && (
+        <div className="card p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+              <Clock className="h-5 w-5 mr-2" />
+              Working Days Configuration
+            </h3>
+            {!isEditingWorkingDays ? (
+              <button
+                onClick={() => setIsEditingWorkingDays(true)}
+                className="btn-primary flex items-center"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Configuration
+              </button>
+            ) : (
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setIsEditingWorkingDays(false)
+                    fetchWorkingDaysConfig() // Reset to original values
+                  }}
+                  className="btn-secondary flex items-center"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveWorkingDays}
+                  disabled={savingWorkingDays}
+                  className="btn-primary flex items-center"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {savingWorkingDays ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-6">
+            {/* Working Hours Per Day */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Working Hours Per Day
+              </label>
+              {isEditingWorkingDays ? (
+                <input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="24"
+                  value={workingDaysConfig.working_hours_per_day}
+                  onChange={(e) => handleWorkingDaysChange('working_hours_per_day', parseFloat(e.target.value))}
+                  className="input-field w-32"
+                />
+              ) : (
+                <p className="text-gray-900 dark:text-white font-medium">
+                  {workingDaysConfig.working_hours_per_day} hours
+                </p>
+              )}
+            </div>
+
+            {/* Working Days Per Week */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Working Days Per Week
+              </label>
+              <p className="text-gray-900 dark:text-white font-medium">
+                {workingDaysConfig.working_days_per_week} days
+              </p>
+            </div>
+
+            {/* Working Days Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Working Days
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { key: 'monday_working', label: 'Monday', icon: '1️⃣' },
+                  { key: 'tuesday_working', label: 'Tuesday', icon: '2️⃣' },
+                  { key: 'wednesday_working', label: 'Wednesday', icon: '3️⃣' },
+                  { key: 'thursday_working', label: 'Thursday', icon: '4️⃣' },
+                  { key: 'friday_working', label: 'Friday', icon: '5️⃣' },
+                  { key: 'saturday_working', label: 'Saturday', icon: '6️⃣' },
+                  { key: 'sunday_working', label: 'Sunday', icon: '7️⃣' }
+                ].map(({ key, label, icon }) => (
+                  <div key={key} className="flex items-center">
+                    {isEditingWorkingDays ? (
+                      <button
+                        onClick={() => handleDayToggle(key)}
+                        className={`flex items-center justify-center w-full p-3 rounded-lg border-2 transition-colors ${
+                          workingDaysConfig[key]
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                            : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                        }`}
+                      >
+                        <span className="mr-2">{icon}</span>
+                        <span className="font-medium">{label}</span>
+                      </button>
+                    ) : (
+                      <div className={`flex items-center justify-center w-full p-3 rounded-lg border-2 ${
+                        workingDaysConfig[key]
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                          : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                      }`}>
+                        <span className="mr-2">{icon}</span>
+                        <span className="font-medium">{label}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Configuration Info */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+              <div className="flex items-start">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                    Working Days Configuration
+                  </h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    This configuration affects salary calculations, leave management, and working day calculations. 
+                    Changes will apply to all future salary slips and leave calculations.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
