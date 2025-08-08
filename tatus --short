@@ -1,0 +1,5 @@
+[33m2a15f8e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix 404 error
+[33m4eaa4dc[m fix some errors
+[33mfde4d34[m Fix frontend build output directory for Vercel deployment
+[33mf4e9d23[m Fix Vercel build configuration for frontend output directory
+[33m577dac9[m Add axios dependency to frontend and fix Vercel deployment
