@@ -1,5 +1,6 @@
 const { supabase, supabaseAdmin } = require('../config/supabase')
 const emailService = require('../utils/emailService')
+const { generateSalarySlipPDF } = require('../utils/salarySlipPDF')
 const { 
   calculateWorkingDaysInMonth, 
   calculateDailySalary, 
@@ -7,7 +8,7 @@ const {
   calculateLeaveDays
 } = require('../utils/workingDaysCalculator')
 
-// Get all salary components (additions/deductions)
+// Get salary components
 const getSalaryComponents = async (req, res) => {
   try {
     const currentUser = req.user;
@@ -17,19 +18,12 @@ const getSalaryComponents = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    let query = supabaseAdmin
+    const { data: components, error } = await supabaseAdmin
       .from('salary_components')
       .select('*')
+      .eq('company_id', currentUser.company_id)
       .eq('is_active', true)
-      .order('component_type', { ascending: true })
       .order('name', { ascending: true });
-
-    // Apply company isolation for non-admin users
-    if (currentUser.role !== 'admin') {
-      query = query.eq('company_id', currentUser.company_id);
-    }
-
-    const { data: components, error } = await query;
 
     if (error) {
       return res.status(500).json({ error: error.message });
@@ -37,7 +31,6 @@ const getSalaryComponents = async (req, res) => {
 
     res.json({ components });
   } catch (error) {
-    console.error('Get salary components error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -84,7 +77,6 @@ const addSalaryComponent = async (req, res) => {
       component
     });
   } catch (error) {
-    console.error('Add salary component error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -102,7 +94,6 @@ const getEmployeeFixedDeductions = async (employeeId) => {
     if (error) {
       // If table doesn't exist, return empty array instead of throwing error
       if (error.code === '42P01') { // Table doesn't exist
-        console.warn('employee_fixed_deductions table does not exist');
         return [];
       }
       throw new Error(error.message);
@@ -110,7 +101,6 @@ const getEmployeeFixedDeductions = async (employeeId) => {
 
     return deductions || [];
   } catch (error) {
-    console.error('Get employee fixed deductions error:', error);
     return [];
   }
 };
@@ -131,143 +121,58 @@ const calculateLeaveImpact = async (employeeId, month, year) => {
 
     // Get leave requests for the specific month and year
     const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0); // Last day of the month
+    const endDate = new Date(year, month, 0);
 
-    let leaves = [];
-    let leaveError = null;
+    // Get unpaid leave requests for the month
+    const { data: unpaidLeaves, error: leaveError } = await supabaseAdmin
+      .from('leave_requests')
+      .select('total_days, leave_type_id')
+      .eq('employee_id', employeeId)
+      .eq('status', 'approved_by_hr')
+      .gte('start_date', startDate.toISOString().split('T')[0])
+      .lte('end_date', endDate.toISOString().split('T')[0])
+      .in('leave_type_id', ['550e8400-e29b-41d4-a716-446655440003']); // Only personal leave is unpaid
 
-    try {
-      // Get leave requests with leave type information
-      const { data: leaveData, error: leaveErr } = await supabaseAdmin
-        .from('leave_requests')
-        .select(`
-          *,
-          leave_types (
-            id,
-            name,
-            is_paid
-          )
-        `)
-        .eq('employee_id', employeeId)
-        .eq('status', 'approved_by_hr')
-        .gte('start_date', startDate.toISOString().split('T')[0])
-        .lte('end_date', endDate.toISOString().split('T')[0]);
-
-      if (leaveErr) {
-        // If table doesn't exist, just continue with empty leaves
-        if (leaveErr.code === '42P01') { // Table doesn't exist
-          console.warn('leave_requests table does not exist, continuing with no leaves');
-          leaves = [];
-        } else {
-          throw new Error(leaveErr.message);
-        }
-      } else {
-        leaves = leaveData || [];
+    if (leaveError) {
+      // If table doesn't exist, continue with no leaves
+      if (leaveError.code === '42P01') {
+        return 0;
       }
-    } catch (error) {
-      // If table doesn't exist, just continue with empty leaves
-      if (error.message.includes('does not exist')) {
-        console.warn('leave_requests table does not exist, continuing with no leaves');
-        leaves = [];
-      } else {
-        throw error;
-      }
+      throw new Error(leaveError.message);
     }
 
-    // Calculate total leave days and unpaid leave days for the month
-    let totalLeaveDays = 0;
-    let unpaidLeaveDays = 0;
-    
-    if (leaves && leaves.length > 0) {
-      for (const leave of leaves) {
-        const start = new Date(leave.start_date);
-        const end = new Date(leave.end_date);
-        
-        // Calculate working days between start and end dates for this month
-        const monthStart = new Date(Math.max(start, startDate));
-        const monthEnd = new Date(Math.min(end, endDate));
-        
-        // Calculate leave days using the new utility function that respects working days
-        const leaveDaysInMonth = await calculateLeaveDays(
-          employee.company_id, 
-          monthStart, 
-          monthEnd
-        );
-        
-        totalLeaveDays += leaveDaysInMonth;
-        
-        // Check if this is an unpaid leave type
-        const isUnpaidLeave = leave.leave_types && !leave.leave_types.is_paid;
-        if (isUnpaidLeave) {
-          unpaidLeaveDays += leaveDaysInMonth;
-        }
-      }
-    }
+    // Calculate total unpaid days
+    const totalUnpaidDays = unpaidLeaves?.reduce((sum, leave) => sum + (leave.total_days || 0), 0) || 0;
 
-    // Calculate daily salary using 30 days per month (as requested)
-    const dailySalary = calculateDailySalary(employee.salary, 30);
-    const leaveDeduction = dailySalary * unpaidLeaveDays;
+    // Calculate daily salary rate
+    const workingDaysInMonth = await calculateWorkingDaysInMonth(employee.company_id, month, year);
+    const dailySalaryRate = workingDaysInMonth > 0 ? employee.salary / workingDaysInMonth : 0;
 
-    // Update or insert leave salary impact
-    let impact = null;
-    let impactError = null;
+    // Calculate leave impact
+    const leaveImpact = totalUnpaidDays * dailySalaryRate;
 
+    // Store leave impact for future reference (optional)
     try {
-      const { data: impactData, error: impactErr } = await supabaseAdmin
+      await supabaseAdmin
         .from('leave_salary_impact')
         .upsert([{
           employee_id: employeeId,
           month,
           year,
-          total_leaves: totalLeaveDays,
-          paid_leaves: totalLeaveDays - unpaidLeaveDays,
-          unpaid_leaves: unpaidLeaveDays,
-          leave_deduction_amount: leaveDeduction
-        }], { onConflict: 'employee_id,month,year' })
-        .select()
-        .single();
-
-      if (impactErr) {
-        // If table doesn't exist, just continue without storing impact
-        if (impactErr.code === '42P01') { // Table doesn't exist
-          console.warn('leave_salary_impact table does not exist, continuing without storing impact');
-          impact = {
-            total_leaves: totalLeaveDays,
-            paid_leaves: totalLeaveDays - unpaidLeaveDays,
-            unpaid_leaves: unpaidLeaveDays,
-            leave_deduction_amount: leaveDeduction
-          };
-        } else {
-          throw new Error(impactErr.message);
-        }
-      } else {
-        impact = impactData;
-      }
-    } catch (error) {
-      // If table doesn't exist, just continue without storing impact
-      if (error.message.includes('does not exist')) {
-        console.warn('leave_salary_impact table does not exist, continuing without storing impact');
-        impact = {
-          total_leaves: totalLeaveDays,
-          paid_leaves: totalLeaveDays - unpaidLeaveDays,
-          unpaid_leaves: unpaidLeaveDays,
-          leave_deduction_amount: leaveDeduction
-        };
-      } else {
-        throw error;
+          unpaid_days: totalUnpaidDays,
+          impact_amount: leaveImpact,
+          created_at: new Date().toISOString()
+        }]);
+    } catch (impactError) {
+      // If table doesn't exist, continue without storing
+      if (impactError.code !== '42P01') {
+        // Only log if it's not a table doesn't exist error
       }
     }
 
-    return {
-      totalLeaves: totalLeaveDays,
-      paidLeaves: totalLeaveDays - unpaidLeaveDays,
-      unpaidLeaves: unpaidLeaveDays,
-      leaveDeduction,
-      dailySalary
-    };
+    return leaveImpact;
   } catch (error) {
-    console.error('Calculate leave impact error:', error);
-    throw error;
+    return 0;
   }
 };
 
@@ -344,7 +249,7 @@ const generateSalarySlip = async (req, res) => {
 
     // Calculate salary components using new working days calculation
     const totalWorkingDaysInMonth = await calculateWorkingDaysInMonth(employee.company_id, month, year);
-    const actualWorkingDays = totalWorkingDaysInMonth - leaveImpact.unpaidLeaves;
+    const actualWorkingDays = totalWorkingDaysInMonth - (await calculateLeaveDays(employee.company_id, new Date(year, month - 1, 1), new Date(year, month, 0)));
     
     // Calculate daily salary using 30 days per month (as requested)
     const dailySalary = calculateDailySalary(employee.salary, 30);
@@ -377,7 +282,7 @@ const generateSalarySlip = async (req, res) => {
     // Calculate totals
     const totalAdditions = processedAdditions.reduce((sum, item) => sum + item.amount, 0);
     const totalDeductions = processedDeductions.reduce((sum, item) => sum + item.amount, 0) + 
-                           leaveImpact.leaveDeduction + totalFixedDeductions;
+                           leaveImpact + totalFixedDeductions;
 
     const netSalary = grossSalary + totalAdditions - totalDeductions;
 
@@ -391,7 +296,7 @@ const generateSalarySlip = async (req, res) => {
         basic_salary: monthlySalary, // Store monthly basic salary
         total_working_days: totalWorkingDaysInMonth,
         actual_working_days: actualWorkingDays,
-        unpaid_leaves: leaveImpact.unpaidLeaves,
+        unpaid_leaves: (await calculateLeaveDays(employee.company_id, new Date(year, month - 1, 1), new Date(year, month, 0))),
         gross_salary: grossSalary,
         total_additions: totalAdditions,
         total_deductions: totalDeductions,
@@ -435,7 +340,6 @@ const generateSalarySlip = async (req, res) => {
         .insert(slipDetails);
 
       if (detailsError) {
-        console.error('Error creating salary slip details:', detailsError);
         // Don't fail the entire operation if details fail
       }
     }
@@ -454,7 +358,7 @@ const generateSalarySlip = async (req, res) => {
       
       await emailService.sendSalarySlipNotification(salarySlip, employee, details)
     } catch (emailError) {
-      console.log('Email notification failed, but salary slip generated successfully:', emailError.message)
+      // Don't fail the entire operation if email fails
     }
 
     res.status(201).json({
@@ -467,7 +371,6 @@ const generateSalarySlip = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Generate salary slip error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -499,7 +402,6 @@ const getEmployeeSalarySlips = async (req, res) => {
 
     res.json({ salarySlips });
   } catch (error) {
-    console.error('Get employee salary slips error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -546,7 +448,6 @@ const getSalarySlipDetails = async (req, res) => {
       details
     });
   } catch (error) {
-    console.error('Get salary slip details error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -584,7 +485,6 @@ const getAllSalarySlips = async (req, res) => {
 
     res.json({ salarySlips });
   } catch (error) {
-    console.error('Get all salary slips error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -603,7 +503,6 @@ const getEmployeeFixedDeductionsList = async (req, res) => {
     const deductions = await getEmployeeFixedDeductions(employee_id);
     res.json({ deductions });
   } catch (error) {
-    console.error('Get employee fixed deductions error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -660,7 +559,6 @@ const addEmployeeFixedDeduction = async (req, res) => {
       deduction
     });
   } catch (error) {
-    console.error('Add employee fixed deduction error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -702,7 +600,6 @@ const updateEmployeeFixedDeduction = async (req, res) => {
       deduction
     });
   } catch (error) {
-    console.error('Update employee fixed deduction error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -729,7 +626,6 @@ const deleteEmployeeFixedDeduction = async (req, res) => {
 
     res.json({ message: 'Fixed deduction deleted successfully' });
   } catch (error) {
-    console.error('Delete employee fixed deduction error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -766,7 +662,6 @@ const getMySalarySlips = async (req, res) => {
 
     res.json({ salarySlips: salarySlips || [] });
   } catch (error) {
-    console.error('Get my salary slips error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -820,7 +715,67 @@ const getMySalarySlipDetails = async (req, res) => {
       details: details || []
     });
   } catch (error) {
-    console.error('Get my salary slip details error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Download salary slip for current employee
+const downloadMySalarySlip = async (req, res) => {
+  try {
+    const { slip_id } = req.params;
+    const currentUser = req.user;
+
+    // Get employee ID for current user
+    const { data: employee, error: empError } = await supabaseAdmin
+      .from('employees')
+      .select('id, full_name, email, employee_id, department, designation')
+      .eq('user_id', currentUser.id)
+      .single();
+
+    if (empError || !employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // Get salary slip with employee details (only if it belongs to current employee)
+    const { data: salarySlip, error: slipError } = await supabaseAdmin
+      .from('salary_slips')
+      .select(`
+        *,
+        employee:employees(full_name, email, employee_id, department, designation)
+      `)
+      .eq('id', slip_id)
+      .eq('employee_id', employee.id)
+      .single();
+
+    if (slipError || !salarySlip) {
+      return res.status(404).json({ error: 'Salary slip not found' });
+    }
+
+    // Get salary slip details
+    const { data: details, error: detailsError } = await supabaseAdmin
+      .from('salary_slip_details')
+      .select('*')
+      .eq('salary_slip_id', slip_id)
+      .order('component_type', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (detailsError) {
+      return res.status(500).json({ error: detailsError.message });
+    }
+
+    // Generate PDF
+    try {
+      const pdfBuffer = await generateSalarySlipPDF(salarySlip, employee, details || []);
+      
+      // Set response headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="salary_slip_${employee.full_name.replace(/\s+/g, '_')}_${new Date(salarySlip.year, salarySlip.month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).replace(/\s+/g, '_')}.pdf"`);
+      
+      res.send(pdfBuffer);
+    } catch (pdfError) {
+      return res.status(500).json({ error: 'Failed to generate PDF' });
+    }
+  } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -837,5 +792,6 @@ module.exports = {
   updateEmployeeFixedDeduction,
   deleteEmployeeFixedDeduction,
   getMySalarySlips,
-  getMySalarySlipDetails
+  getMySalarySlipDetails,
+  downloadMySalarySlip
 }; 

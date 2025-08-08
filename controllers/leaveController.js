@@ -378,6 +378,7 @@ const getLeaveRequests = async (req, res) => {
     const { data: leaveRequests, error } = await query
 
     if (error) {
+      console.error('Get leave requests error:', error)
       return res.status(500).json({ error: 'Failed to fetch leave requests' })
     }
 

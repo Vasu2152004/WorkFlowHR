@@ -96,7 +96,6 @@ const CompanyProfile = () => {
         values: data.company.values || ''
       })
     } catch (error) {
-      console.error('Error fetching company profile:', error)
       toast.error('Failed to fetch company profile')
     } finally {
       setLoading(false)
@@ -123,14 +122,12 @@ const CompanyProfile = () => {
         setWorkingDaysConfig(data.config)
       } else {
         const error = await response.json()
-        console.error('Failed to fetch working days config:', error.error)
         // Don't show error toast for default config, just log it
         if (response.status !== 404) {
           toast.error(error.error || 'Failed to fetch working days configuration')
         }
       }
     } catch (error) {
-      console.error('Error fetching working days config:', error)
       // Don't show error toast for network issues, just log it
     }
   }
@@ -188,7 +185,6 @@ const CompanyProfile = () => {
       setIsEditing(false)
       toast.success('Company profile updated successfully!')
     } catch (error) {
-      console.error('Error updating company profile:', error)
       toast.error(error.message || 'Failed to update company profile')
     }
   }
@@ -260,7 +256,6 @@ const CompanyProfile = () => {
       setWorkingDaysConfig(result.config)
       setIsEditingWorkingDays(false)
     } catch (error) {
-      console.error('Error saving working days config:', error)
       toast.error(error.message || 'Failed to update working days configuration')
     } finally {
       setSavingWorkingDays(false)

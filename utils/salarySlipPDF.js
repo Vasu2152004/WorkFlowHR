@@ -2,23 +2,17 @@ const puppeteer = require('puppeteer')
 
 // Generate salary slip PDF
 const generateSalarySlipPDF = async (salarySlip, employee, details = []) => {
-  let browser
   try {
-    // Launch browser
-    browser = await puppeteer.launch({
+    const html = generateSalarySlipHTML(salarySlip, employee, details)
+    
+    const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     })
-
+    
     const page = await browser.newPage()
-
-    // Create HTML content for salary slip
-    const htmlContent = generateSalarySlipHTML(salarySlip, employee, details)
-
-    // Set content and wait for it to load
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
-
-    // Generate PDF with proper settings
+    await page.setContent(html, { waitUntil: 'networkidle0' })
+    
     const pdf = await page.pdf({
       format: 'A4',
       margin: {
@@ -27,18 +21,13 @@ const generateSalarySlipPDF = async (salarySlip, employee, details = []) => {
         bottom: '20mm',
         left: '20mm'
       },
-      printBackground: true,
-      displayHeaderFooter: false
+      printBackground: true
     })
-
+    
+    await browser.close()
     return pdf
   } catch (error) {
-    console.error('Salary slip PDF generation error:', error)
-    throw new Error('Failed to generate salary slip PDF')
-  } finally {
-    if (browser) {
-      await browser.close()
-    }
+    throw new Error('Failed to generate PDF')
   }
 }
 

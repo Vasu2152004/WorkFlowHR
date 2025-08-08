@@ -12,13 +12,18 @@ const getDocumentTemplates = async (req, res) => {
       .order('created_at', { ascending: false })
 
     if (error) {
-      return res.status(500).json({ error: 'Failed to fetch templates' })
+      return res.status(500).json({ 
+        error: 'Failed to fetch templates',
+        details: error.message 
+      })
     }
 
-    res.json({ templates })
+    res.json({ templates: templates || [] })
   } catch (error) {
-    console.error('Get document templates error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message 
+    })
   }
 }
 
@@ -40,7 +45,6 @@ const getDocumentTemplate = async (req, res) => {
 
     res.json({ template })
   } catch (error) {
-    console.error('Get document template error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -88,26 +92,28 @@ const createDocumentTemplate = async (req, res) => {
       .from('document_templates')
       .insert({
         company_id: req.user.company_id,
+        document_name,
+        field_tags,
+        content,
+        settings,
         created_by: req.user.id,
-        document_name: document_name.trim(),
-        field_tags: field_tags,
-        content: content,
-        settings: settings
+        is_active: true
       })
-      .select('*')
+      .select()
       .single()
 
     if (error) {
-      return res.status(500).json({ error: 'Failed to create template' })
+      return res.status(500).json({ 
+        error: 'Failed to create template',
+        details: error.message 
+      })
     }
 
     res.status(201).json({ 
       message: 'Template created successfully',
       template 
     })
-
   } catch (error) {
-    console.error('Create document template error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -116,7 +122,7 @@ const createDocumentTemplate = async (req, res) => {
 const updateDocumentTemplate = async (req, res) => {
   try {
     const { id } = req.params
-    const { document_name, field_tags, content, is_active } = req.body
+    const { document_name, field_tags, content, settings = {}, is_active } = req.body
 
     // Validate required fields
     if (!document_name || !field_tags || !content) {
@@ -158,6 +164,7 @@ const updateDocumentTemplate = async (req, res) => {
         document_name: document_name.trim(),
         field_tags: field_tags,
         content: content,
+        settings: settings,
         is_active: is_active !== undefined ? is_active : true,
         updated_at: new Date().toISOString()
       })
@@ -176,7 +183,6 @@ const updateDocumentTemplate = async (req, res) => {
     })
 
   } catch (error) {
-    console.error('Update document template error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -207,7 +213,6 @@ const deleteDocumentTemplate = async (req, res) => {
     })
 
   } catch (error) {
-    console.error('Delete document template error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -255,7 +260,6 @@ const generateDocument = async (req, res) => {
     res.send(pdfBuffer)
 
   } catch (error) {
-    console.error('Generate document error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -500,7 +504,6 @@ const generatePDFFromHTML = async (htmlContent) => {
     return pdf
 
   } catch (error) {
-    console.error('PDF generation error:', error)
     throw new Error('Failed to generate PDF')
   } finally {
     if (browser) {

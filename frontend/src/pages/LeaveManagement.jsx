@@ -7,6 +7,7 @@ const LeaveManagement = () => {
   const { user } = useAuth()
   const [leaveRequests, setLeaveRequests] = useState([])
   const [employees, setEmployees] = useState([])
+  const [leaveTypes, setLeaveTypes] = useState([])
   const [loading, setLoading] = useState(false)
   const [filterStatus, setFilterStatus] = useState('')
   const [filterEmployee, setFilterEmployee] = useState('')
@@ -18,6 +19,7 @@ const LeaveManagement = () => {
     if (user) {
       fetchLeaveRequests()
       fetchEmployees()
+      fetchLeaveTypes()
     }
   }, [user, filterStatus, filterEmployee])
 
@@ -45,7 +47,7 @@ const LeaveManagement = () => {
         setLeaveRequests(Array.isArray(data) ? data : [])
       }
     } catch (error) {
-      console.error('Error fetching leave requests:', error)
+      // Handle error silently
     }
   }
 
@@ -63,11 +65,27 @@ const LeaveManagement = () => {
         // Handle both array and object response formats
         const employeesArray = Array.isArray(data) ? data : (data.employees || [])
         setEmployees(employeesArray)
-      } else {
-        console.error('Failed to fetch employees:', response.status)
       }
     } catch (error) {
-      console.error('Error fetching employees:', error)
+      // Handle error silently
+    }
+  }
+
+  const fetchLeaveTypes = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const response = await fetch('http://localhost:3000/api/leaves/types', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setLeaveTypes(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      // Handle error silently
     }
   }
 
@@ -115,7 +133,6 @@ const LeaveManagement = () => {
       // Refresh data
       fetchLeaveRequests()
     } catch (error) {
-      console.error('Error updating leave request:', error)
       toast.error(error.message || 'Failed to update leave request')
     } finally {
       setLoading(false)
@@ -175,7 +192,26 @@ const LeaveManagement = () => {
       return request.leave_types.name
     }
     
-    // Fallback to UUID if no name found
+    // If no joined data, try to find the leave type from the leaveTypes state
+    if (leaveTypes.length > 0) {
+      const leaveType = leaveTypes.find(type => type.id === request.leave_type_id)
+      if (leaveType) {
+        return leaveType.name
+      }
+    }
+    
+    // Fallback mapping for common leave types
+    const fallbackTypes = {
+      '550e8400-e29b-41d4-a716-446655440001': 'Annual Leave',
+      '550e8400-e29b-41d4-a716-446655440002': 'Sick Leave',
+      '550e8400-e29b-41d4-a716-446655440003': 'Personal Leave'
+    }
+    
+    if (fallbackTypes[request.leave_type_id]) {
+      return fallbackTypes[request.leave_type_id]
+    }
+    
+    // Final fallback to UUID if no name found
     return request.leave_type_id || 'Unknown Type'
   }
 

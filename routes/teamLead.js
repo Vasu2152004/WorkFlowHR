@@ -4,8 +4,7 @@ const { authenticateToken } = require('../middleware/auth');
 const {
   getTeamMembers,
   getPendingLeaveRequests,
-  approveLeaveRequest,
-  getTeamLeadDashboard
+  approveLeaveRequest
 } = require('../controllers/teamLeadController');
 
 // Team Lead routes - all require authentication
@@ -19,8 +18,5 @@ router.get('/leave-requests/pending', getPendingLeaveRequests);
 
 // Approve/Reject leave request
 router.put('/leave-requests/:id/approve', approveLeaveRequest);
-
-// Get team lead dashboard
-router.get('/dashboard', getTeamLeadDashboard);
 
 module.exports = router; 

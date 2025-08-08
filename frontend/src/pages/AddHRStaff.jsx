@@ -137,7 +137,6 @@ export default function AddHRStaff() {
       toast.success(`${formData.role === 'hr_manager' ? 'HR Manager' : 'HR Staff'} created successfully!`)
 
     } catch (error) {
-      console.error('Error creating HR staff:', error)
       setError(error.message || 'Failed to create HR staff')
       toast.error(error.message || 'Failed to create HR staff')
     } finally {

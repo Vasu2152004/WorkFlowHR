@@ -116,9 +116,9 @@ router.get('/dashboard', async (req, res) => {
       },
       stats: {
         totalEmployees: 0,
-        activeProjects: 0,
+        pendingLeaveRequests: 0,
         leaveRequests: 0,
-        totalPayroll: 0
+        salarySlipsGenerated: 0
       },
       recentEmployees: [],
       companyInfo: null
@@ -138,21 +138,55 @@ router.get('/dashboard', async (req, res) => {
         dashboardData.recentEmployees = employees;
       }
     } catch (error) {
-      console.log('Error fetching employees:', error.message);
+      // Continue with 0 if employees fetch fails
     }
 
-    // Get leave requests count
+    // Get pending leave requests count
+    try {
+      const { data: pendingLeaveRequests, error: leaveError } = await supabaseAdmin
+        .from('leave_requests')
+        .select('id')
+        .eq('status', 'pending')
+        .eq('company_id', user.company_id);
+
+      if (!leaveError && pendingLeaveRequests) {
+        dashboardData.stats.pendingLeaveRequests = pendingLeaveRequests.length;
+      }
+    } catch (error) {
+      // Continue with 0 if leave requests fetch fails
+    }
+
+    // Get total leave requests count
     try {
       const { data: leaveRequests, error: leaveError } = await supabaseAdmin
         .from('leave_requests')
         .select('id')
-        .eq('status', 'pending');
+        .eq('company_id', user.company_id);
 
       if (!leaveError && leaveRequests) {
         dashboardData.stats.leaveRequests = leaveRequests.length;
       }
     } catch (error) {
-      console.log('Error fetching leave requests:', error.message);
+      // Continue with 0 if leave requests fetch fails
+    }
+
+    // Get salary slips generated this month
+    try {
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+      
+      const { data: salarySlips, error: salaryError } = await supabaseAdmin
+        .from('salary_slips')
+        .select('id')
+        .eq('company_id', user.company_id)
+        .eq('month', currentMonth)
+        .eq('year', currentYear);
+
+      if (!salaryError && salarySlips) {
+        dashboardData.stats.salarySlipsGenerated = salarySlips.length;
+      }
+    } catch (error) {
+      // Continue with 0 if salary slips fetch fails
     }
 
     // Get company info
@@ -167,12 +201,11 @@ router.get('/dashboard', async (req, res) => {
         dashboardData.companyInfo = company;
       }
     } catch (error) {
-      console.log('Error fetching company info:', error.message);
+      // Continue with null if company info fetch fails
     }
 
     res.json(dashboardData);
   } catch (error) {
-    console.error('Dashboard error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
   }
 });

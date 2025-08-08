@@ -42,7 +42,7 @@ const LeaveRequest = () => {
         setLeaveTypes(Array.isArray(data) ? data : [])
       }
     } catch (error) {
-      console.error('Error fetching leave types:', error)
+      // Handle error silently
     }
   }
 
@@ -60,7 +60,7 @@ const LeaveRequest = () => {
         setLeaveBalance(data.balances || [])
       }
     } catch (error) {
-      console.error('Error fetching leave balance:', error)
+      // Handle error silently
     }
   }
 
@@ -78,7 +78,7 @@ const LeaveRequest = () => {
         setLeaveRequests(Array.isArray(data) ? data : [])
       }
     } catch (error) {
-      console.error('Error fetching leave requests:', error)
+      // Handle error silently
     }
   }
 
@@ -96,7 +96,7 @@ const LeaveRequest = () => {
         setEmployees(Array.isArray(data) ? data : [])
       }
     } catch (error) {
-      console.error('Error fetching employees:', error)
+      // Handle error silently
     }
   }
 
@@ -137,7 +137,6 @@ const LeaveRequest = () => {
       fetchLeaveRequests()
       fetchLeaveBalance()
     } catch (error) {
-      console.error('Error creating leave request:', error)
       toast.error(error.message || 'Failed to create leave request')
     } finally {
       setLoading(false)
@@ -165,6 +164,35 @@ const LeaveRequest = () => {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString()
+  }
+
+  const getLeaveTypeName = (request) => {
+    // First try to get from the joined leave_types data
+    if (request.leave_types && request.leave_types.name) {
+      return request.leave_types.name
+    }
+    
+    // If no joined data, try to find the leave type from the leaveTypes state
+    if (leaveTypes.length > 0) {
+      const leaveType = leaveTypes.find(type => type.id === request.leave_type_id)
+      if (leaveType) {
+        return leaveType.name
+      }
+    }
+    
+    // Fallback mapping for common leave types
+    const fallbackTypes = {
+      '550e8400-e29b-41d4-a716-446655440001': 'Annual Leave',
+      '550e8400-e29b-41d4-a716-446655440002': 'Sick Leave',
+      '550e8400-e29b-41d4-a716-446655440003': 'Personal Leave'
+    }
+    
+    if (fallbackTypes[request.leave_type_id]) {
+      return fallbackTypes[request.leave_type_id]
+    }
+    
+    // Final fallback to UUID if no name found
+    return request.leave_type_id || 'Unknown Type'
   }
 
   if (!user) {
@@ -324,7 +352,7 @@ const LeaveRequest = () => {
               {leaveRequests.map((request) => (
                 <tr key={request.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {request.leave_type_id}
+                    {getLeaveTypeName(request)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(request.start_date)} - {formatDate(request.end_date)}

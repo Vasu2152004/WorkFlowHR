@@ -29,7 +29,6 @@ const validateGenerateDocument = [
 
 // Apply authentication to all routes
 router.use(authenticateToken);
-router.use(validateCompanyAccess);
 
 // Document template routes (HR only)
 router.get('/templates', requireHR, documentController.getDocumentTemplates);

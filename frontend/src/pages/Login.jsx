@@ -24,7 +24,7 @@ const Login = () => {
         navigate('/dashboard')
       }
     } catch (error) {
-      console.error('Login error:', error)
+      // Handle error silently
     } finally {
       setLoading(false)
     }
@@ -45,11 +45,11 @@ const Login = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full mb-4">
             <Building className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-2">
             Welcome Back
           </h2>
-          <p className="text-slate-600 dark:text-gray-300 mt-2">
-            Sign in to your HRMS account
+          <p className="text-gray-600 dark:text-gray-400 text-center mb-8">
+            Sign in to your WorkFlowHR account
           </p>
         </div>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useParams, useNavigate } from 'react-router-dom'
 import { 
   FileText,
   Edit,
@@ -30,14 +31,17 @@ import {
   Table,
   Code,
   Undo,
-  Redo
+  Redo,
+  Loader2
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
 import DocumentThemes from '../components/DocumentThemes'
 
-const CreateTemplate = () => {
+const EditTemplate = () => {
   const { user, API_BASE_URL } = useAuth()
+  const { id } = useParams()
+  const navigate = useNavigate()
   const [documentName, setDocumentName] = useState('')
   const [fieldTags, setFieldTags] = useState([
     { tag: '', label: '' }
@@ -45,6 +49,7 @@ const CreateTemplate = () => {
   const [content, setContent] = useState('<p>Start writing your document here...</p>')
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showThemes, setShowThemes] = useState(false)
@@ -59,6 +64,76 @@ const CreateTemplate = () => {
     watermark: '',
     pageNumbers: false
   })
+
+  // Fetch template data
+  useEffect(() => {
+    if (id) {
+      fetchTemplate()
+    }
+  }, [id])
+
+  const fetchTemplate = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const token = localStorage.getItem('access_token')
+      
+      if (!token) {
+        setError('No authentication token found')
+        toast.error('Please login again')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/documents/templates/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please login again.')
+          return
+        }
+        if (response.status === 403) {
+          setError('Access denied. You need HR permissions to edit templates.')
+          toast.error('Access denied. You need HR permissions to edit templates.')
+          return
+        }
+        if (response.status === 404) {
+          setError('Template not found.')
+          toast.error('Template not found.')
+          return
+        }
+        throw new Error(`Failed to fetch template: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const template = data.template
+      
+      if (template) {
+        setDocumentName(template.document_name || '')
+        setFieldTags(template.field_tags || [{ tag: '', label: '' }])
+        setContent(template.content || '<p>Start writing your document here...</p>')
+        setTemplateSettings(template.settings || {
+          fontSize: '14px',
+          fontFamily: 'Arial',
+          lineHeight: '1.6',
+          pageMargins: '1in',
+          headerEnabled: false,
+          footerEnabled: false,
+          watermark: '',
+          pageNumbers: false
+        })
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to load template')
+      toast.error(error.message || 'Failed to load template')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleInsertPlaceholder = (placeholder) => {
     const placeholderText = `{{${placeholder}}}`
@@ -182,19 +257,19 @@ const CreateTemplate = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
+    setSaving(true)
     setError('')
     setSuccess('')
 
     if (!validateForm()) {
-      setLoading(false)
+      setSaving(false)
       return
     }
 
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/documents/templates`, {
-        method: 'POST',
+      const response = await fetch(`${API_BASE_URL}/documents/templates/${id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -213,27 +288,26 @@ const CreateTemplate = () => {
           return
         }
         if (response.status === 403) {
-          toast.error('Access denied. You need HR permissions to create templates.')
+          toast.error('Access denied. You need HR permissions to edit templates.')
           return
         }
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create template')
+        throw new Error(errorData.error || 'Failed to update template')
       }
 
       const data = await response.json()
-      setSuccess('Template created successfully!')
-      toast.success('Template created successfully!')
+      setSuccess('Template updated successfully!')
+      toast.success('Template updated successfully!')
       
-      // Reset form
-      setDocumentName('')
-      setFieldTags([{ tag: '', label: '' }])
-      setContent('<p>Start writing your document here...</p>')
-      setIsPreviewMode(false)
+      // Navigate back to templates list after a short delay
+      setTimeout(() => {
+        navigate('/generate-document')
+      }, 1500)
     } catch (error) {
-      setError(error.message || 'Failed to create template')
-      toast.error(error.message || 'Failed to create template')
+      setError(error.message || 'Failed to update template')
+      toast.error(error.message || 'Failed to update template')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
@@ -263,13 +337,25 @@ const CreateTemplate = () => {
     setShowThemes(false)
   }
 
-  if (!user || user.role !== 'hr') {
+  if (!user || !['hr', 'hr_manager', 'admin'].includes(user.role)) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600">Only HR users can create document templates.</p>
+          <p className="text-gray-600">Only HR users can edit document templates.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Loader2 className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-spin" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Loading Template...</h2>
+          <p className="text-gray-600">Please wait while we load the template data.</p>
         </div>
       </div>
     )
@@ -281,14 +367,14 @@ const CreateTemplate = () => {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => window.history.back()}
+            onClick={() => navigate('/generate-document')}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create Document Template</h1>
-            <p className="text-gray-600 dark:text-gray-300">Create reusable document templates with dynamic variables</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Document Template</h1>
+            <p className="text-gray-600 dark:text-gray-300">Update your existing document template</p>
           </div>
         </div>
       </div>
@@ -610,55 +696,56 @@ const CreateTemplate = () => {
               </div>
             )}
 
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="btn-primary w-full flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <div className="loading-spinner h-4 w-4 mr-2"></div>
-                  Creating Template...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Create Template
-                </>
-              )}
-            </button>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => navigate('/generate-document')}
+                className="btn-secondary flex-1 flex items-center justify-center"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="btn-primary flex-1 flex items-center justify-center"
+              >
+                {saving ? (
+                  <>
+                    <div className="loading-spinner h-4 w-4 mr-2"></div>
+                    Updating Template...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Update Template
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Right Column - Help */}
         <div className="space-y-6">
           <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">How to Use</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Editing Tips</h3>
             <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
-              <p>1. <strong>Name your document</strong> - Give it a descriptive name</p>
-              <p>2. <strong>Add custom fields</strong> - Enter field names (tags are auto-generated)</p>
-              <p>3. <strong>Choose a theme</strong> - Select from predefined professional templates</p>
-              <p>4. <strong>Write your content</strong> - Use the rich text editor to create your document</p>
-              <p>5. <strong>Insert placeholders</strong> - Use the dropdown to add placeholders where you want dynamic content</p>
-              <p>6. <strong>Configure settings</strong> - Set font, margins, and other formatting options</p>
-              <p>7. <strong>Preview</strong> - Switch to preview mode to see how it looks with sample data</p>
-              <p>8. <strong>Export/Import</strong> - Share templates with other HR users</p>
-              <p>9. <strong>Save</strong> - Create your template for future use</p>
+              <p>• <strong>Preview changes</strong> - Use preview mode to see how your template looks</p>
+              <p>• <strong>Test placeholders</strong> - Make sure all placeholders are working correctly</p>
+              <p>• <strong>Backup first</strong> - Export your template before making major changes</p>
+              <p>• <strong>Validate fields</strong> - Ensure all required fields are properly configured</p>
+              <p>• <strong>Check formatting</strong> - Verify that the document formatting looks professional</p>
             </div>
           </div>
 
           <div className="card p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
-            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-4">Tips</h3>
-            <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
-              <li>• Use clear, descriptive field names</li>
-              <li>• Field tags are automatically generated from field names</li>
-              <li>• Test your template with preview mode</li>
-              <li>• Use formatting to make your documents look professional</li>
-              <li>• Choose from pre-built themes for common HR documents</li>
-              <li>• Export templates to share with other HR users</li>
-              <li>• Use advanced settings for custom formatting</li>
-              <li>• Collapse sidebar for more screen space</li>
-            </ul>
+            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-4">Template Info</h3>
+            <div className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
+              <p><strong>Template ID:</strong> {id}</p>
+              <p><strong>Created:</strong> {new Date().toLocaleDateString()}</p>
+              <p><strong>Fields:</strong> {fieldTags.length} dynamic field{fieldTags.length !== 1 ? 's' : ''}</p>
+              <p><strong>Status:</strong> Active</p>
+            </div>
           </div>
         </div>
       </div>
@@ -674,4 +761,4 @@ const CreateTemplate = () => {
   )
 }
 
-export default CreateTemplate 
+export default EditTemplate

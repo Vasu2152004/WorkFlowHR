@@ -65,7 +65,6 @@ const CompanyCalendar = () => {
         throw new Error('Failed to fetch calendar events')
       }
     } catch (error) {
-      console.error('Error fetching events:', error)
       toast.error('Failed to fetch calendar events')
     } finally {
       setLoading(false)
@@ -128,7 +127,6 @@ const CompanyCalendar = () => {
       // Refresh events
       fetchEvents()
     } catch (error) {
-      console.error('Error saving calendar event:', error)
       toast.error(error.message || 'Failed to save calendar event')
     } finally {
       setLoading(false)
@@ -158,7 +156,6 @@ const CompanyCalendar = () => {
       toast.success(data.message)
       fetchEvents()
     } catch (error) {
-      console.error('Error deleting event:', error)
       toast.error(error.message || 'Failed to delete calendar event')
     }
   }

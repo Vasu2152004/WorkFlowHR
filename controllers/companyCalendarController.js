@@ -32,13 +32,11 @@ const getCalendarEvents = async (req, res) => {
     const { data: events, error } = await query
 
     if (error) {
-      console.error('Error fetching calendar events:', error)
       return res.status(500).json({ error: 'Failed to fetch calendar events' })
     }
 
     res.json(events || [])
   } catch (error) {
-    console.error('Get calendar events error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -88,7 +86,6 @@ const createCalendarEvent = async (req, res) => {
       .single()
 
     if (error) {
-      console.error('Create calendar event error:', error)
       return res.status(500).json({ error: error.message })
     }
 
@@ -97,7 +94,6 @@ const createCalendarEvent = async (req, res) => {
       event
     })
   } catch (error) {
-    console.error('Create calendar event error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -109,11 +105,8 @@ const updateCalendarEvent = async (req, res) => {
     const { id } = req.params
     const { title, description, date, type, is_recurring, recurring_pattern } = req.body
 
-    console.log('🔍 Update calendar event - User role:', currentUser.role, 'User ID:', currentUser.id)
-
     // Ensure company_id is available
     if (!currentUser.company_id) {
-      console.log('❌ Company ID not found for user:', currentUser.id)
       return res.status(400).json({ error: 'Company ID not found for user' })
     }
 
@@ -133,8 +126,6 @@ const updateCalendarEvent = async (req, res) => {
     if (type && !validTypes.includes(type)) {
       return res.status(400).json({ error: 'Invalid event type' })
     }
-
-    console.log('✅ User authorized for update - Role:', currentUser.role, 'Company ID:', currentUser.company_id)
 
     // Check if event exists and belongs to the company
     const { data: existingEvent, error: checkError } = await supabaseAdmin
@@ -166,17 +157,14 @@ const updateCalendarEvent = async (req, res) => {
       .single()
 
     if (error) {
-      console.error('Update calendar event error:', error)
       return res.status(500).json({ error: error.message })
     }
 
-    console.log('✅ Calendar event updated successfully:', event)
     res.json({
       message: 'Calendar event updated successfully',
       event
     })
   } catch (error) {
-    console.error('Update calendar event error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -187,15 +175,10 @@ const deleteCalendarEvent = async (req, res) => {
     const currentUser = req.user
     const { id } = req.params
 
-    console.log('🔍 Delete calendar event - User role:', currentUser.role, 'User ID:', currentUser.id)
-
     // Ensure company_id is available
     if (!currentUser.company_id) {
-      console.log('❌ Company ID not found for user:', currentUser.id)
       return res.status(400).json({ error: 'Company ID not found for user' })
     }
-
-    console.log('✅ User authorized for delete - Role:', currentUser.role, 'Company ID:', currentUser.company_id)
 
     // Check if event exists and belongs to the company
     const { data: existingEvent, error: checkError } = await supabaseAdmin
@@ -217,17 +200,14 @@ const deleteCalendarEvent = async (req, res) => {
       .eq('company_id', currentUser.company_id)
 
     if (error) {
-      console.error('Delete calendar event error:', error)
       return res.status(500).json({ error: error.message })
     }
 
-    console.log('✅ Calendar event deleted successfully:', existingEvent.title)
     res.json({
       message: 'Calendar event deleted successfully',
       deletedEvent: existingEvent
     })
   } catch (error) {
-    console.error('Delete calendar event error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -238,19 +218,14 @@ const getCalendarEventsByDateRange = async (req, res) => {
     const currentUser = req.user
     const { start_date, end_date, type } = req.query
 
-    console.log('🔍 Get calendar events by date range - User role:', currentUser.role, 'User ID:', currentUser.id)
-
     // Ensure company_id is available
     if (!currentUser.company_id) {
-      console.log('❌ Company ID not found for user:', currentUser.id)
       return res.status(400).json({ error: 'Company ID not found for user' })
     }
 
     if (!start_date || !end_date) {
       return res.status(400).json({ error: 'Start date and end date are required' })
     }
-
-    console.log('✅ User authorized - Role:', currentUser.role, 'Company ID:', currentUser.company_id)
 
     let query = supabaseAdmin
       .from('company_calendar')
@@ -268,14 +243,11 @@ const getCalendarEventsByDateRange = async (req, res) => {
     const { data: events, error } = await query
 
     if (error) {
-      console.error('Error fetching calendar events by date range:', error)
       return res.status(500).json({ error: 'Failed to fetch calendar events' })
     }
 
-    console.log('✅ Calendar events found for date range:', events?.length || 0)
     res.json(events || [])
   } catch (error) {
-    console.error('Get calendar events by date range error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

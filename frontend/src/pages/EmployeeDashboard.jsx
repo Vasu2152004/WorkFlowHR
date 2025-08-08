@@ -35,6 +35,8 @@ const EmployeeDashboard = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [salarySlips, setSalarySlips] = useState([])
   const [loadingSlips, setLoadingSlips] = useState(false)
+  const [showSalarySlipModal, setShowSalarySlipModal] = useState(false)
+  const [selectedSalarySlip, setSelectedSalarySlip] = useState(null)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -43,7 +45,7 @@ const EmployeeDashboard = () => {
     return () => clearInterval(timer)
   }, [])
 
-  // Fetch employees from backend
+  // Fetch employees
   const fetchEmployees = async () => {
     setLoading(true)
     try {
@@ -53,7 +55,7 @@ const EmployeeDashboard = () => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/users/employees/view`, {
+      const response = await fetch(`${API_BASE_URL}/users/employees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -71,7 +73,6 @@ const EmployeeDashboard = () => {
       setEmployees(data.employees || [])
       setFilteredEmployees(data.employees || [])
     } catch (error) {
-      console.error('Error fetching employees:', error)
       toast.error('Failed to fetch employees')
     } finally {
       setLoading(false)
@@ -105,7 +106,6 @@ const EmployeeDashboard = () => {
       const data = await response.json()
       setSalarySlips(data.salarySlips || [])
     } catch (error) {
-      console.error('Error fetching salary slips:', error)
       toast.error('Failed to fetch salary slips')
     } finally {
       setLoadingSlips(false)
@@ -139,8 +139,13 @@ const EmployeeDashboard = () => {
   }
 
   const handleViewSalarySlip = (slipId) => {
-    // Navigate to salary slip detail page
-    window.open(`/salary-slip/${slipId}`, '_blank');
+    const slip = salarySlips.find(s => s.id === slipId);
+    if (slip) {
+      setSelectedSalarySlip(slip);
+      setShowSalarySlipModal(true);
+    } else {
+      toast.error('Salary slip not found');
+    }
   };
 
   const handleDownloadSalarySlip = async (slipId) => {
@@ -169,14 +174,13 @@ const EmployeeDashboard = () => {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `salary_slip_${slipId}.pdf` // Suggest a filename
+      a.download = `salary_slip_${slipId}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
       toast.success('Salary slip downloaded successfully!')
     } catch (error) {
-      console.error('Error downloading salary slip:', error)
       toast.error('Failed to download salary slip')
     }
   };
@@ -633,6 +637,125 @@ const EmployeeDashboard = () => {
                     {selectedEmployee.created_at ? formatDate(selectedEmployee.created_at) : 'N/A'}
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Salary Slip Detail Modal */}
+      {showSalarySlipModal && selectedSalarySlip && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-strong max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Salary Slip Details
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowSalarySlipModal(false)
+                    setSelectedSalarySlip(null)
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-6">
+                <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  {new Date(selectedSalarySlip.year, selectedSalarySlip.month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Generated on: {new Date(selectedSalarySlip.created_at).toLocaleDateString()}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-900 dark:text-white mb-3">Salary Summary</h5>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Gross Salary:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        ₹{selectedSalarySlip.gross_salary?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Total Additions:</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        +₹{selectedSalarySlip.total_additions?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Total Deductions:</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        -₹{selectedSalarySlip.total_deductions?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="font-bold text-gray-900 dark:text-white">Net Salary:</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400">
+                        ₹{selectedSalarySlip.net_salary?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-900 dark:text-white mb-3">Working Details</h5>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Total Working Days:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {selectedSalarySlip.total_working_days || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Actual Working Days:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {selectedSalarySlip.actual_working_days || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Unpaid Leaves:</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        {selectedSalarySlip.unpaid_leaves || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedSalarySlip.notes && (
+                <div className="mb-6">
+                  <h5 className="font-semibold text-gray-900 dark:text-white mb-2">Notes</h5>
+                  <p className="text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    {selectedSalarySlip.notes}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => handleDownloadSalarySlip(selectedSalarySlip.id)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSalarySlipModal(false)
+                    setSelectedSalarySlip(null)
+                  }}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

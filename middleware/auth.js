@@ -9,7 +9,6 @@ const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
     } catch (error) {
       if (i === maxRetries - 1) throw error;
       if (error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.includes('timeout')) {
-        console.log(`🔄 Retrying operation (attempt ${i + 1}/${maxRetries})...`);
         await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
         continue;
       }
@@ -37,8 +36,6 @@ const authenticateToken = async (req, res, next) => {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
 
-    console.log('🔍 Auth middleware - User from token:', user.id, user.email);
-
     // Get user details from our users table using admin client to bypass RLS
     const { data: userData, error: userError } = await retryOperation(async () => {
       return await supabaseAdmin
@@ -48,11 +45,7 @@ const authenticateToken = async (req, res, next) => {
         .single();
     });
 
-    console.log('🔍 Auth middleware - User lookup result:', userData ? 'Found' : 'Not found', userError?.message);
-
     if (userError || !userData) {
-      console.log('🔍 Auth middleware - User not found, creating...');
-      
       // Get or create company with retry
       let { data: company } = await retryOperation(async () => {
         return await supabaseAdmin
@@ -90,20 +83,16 @@ const authenticateToken = async (req, res, next) => {
       });
 
       if (createError) {
-        console.error('🔍 Auth middleware - Error creating user:', createError);
         return res.status(403).json({ error: 'User not found in system' });
       }
 
       req.user = newUser;
-      console.log('🔍 Auth middleware - User created and set:', newUser.id);
     } else {
       req.user = userData;
-      console.log('🔍 Auth middleware - User found and set:', userData.id);
     }
 
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
     if (error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.includes('timeout')) {
       return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
     }
@@ -162,7 +151,6 @@ const validateCompanyAccess = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Company validation error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -218,7 +206,6 @@ const validateEmployeeAccess = async (req, res, next) => {
     req.targetEmployee = employee;
     next();
   } catch (error) {
-    console.error('Employee access validation error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

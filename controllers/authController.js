@@ -62,7 +62,6 @@ const adminSignup = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Admin signup error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -124,7 +123,6 @@ const addHRManager = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Add HR manager error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -186,7 +184,6 @@ const addHRStaff = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Add HR staff error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -220,7 +217,6 @@ const login = async (req, res) => {
 
     // If user doesn't exist in users table, create it
     if (userError || !userData) {
-      console.log('User not found in users table, creating...');
       
       // Get or create company
       let { data: company } = await supabaseAdmin
@@ -253,7 +249,6 @@ const login = async (req, res) => {
         .single();
 
       if (createUserError) {
-        console.error('Error creating user record:', createUserError);
         return res.status(500).json({ error: 'Failed to create user record' });
       }
 
@@ -267,7 +262,6 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -283,7 +277,6 @@ const logout = async (req, res) => {
 
     res.json({ message: 'Logout successful' });
   } catch (error) {
-    console.error('Logout error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -291,7 +284,6 @@ const logout = async (req, res) => {
 // Get current user profile
 const getProfile = async (req, res) => {
   try {
-    console.log('🔍 getProfile - User ID:', req.user.id);
     
     const { data: user, error } = await supabaseAdmin
       .from('users')
@@ -299,15 +291,12 @@ const getProfile = async (req, res) => {
       .eq('id', req.user.id)
       .single();
 
-    console.log('🔍 getProfile - Query result:', user ? 'Found' : 'Not found', error?.message);
-
     if (error || !user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     res.json(user);
   } catch (error) {
-    console.error('Get profile error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -335,7 +324,6 @@ const refreshToken = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Refresh token error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

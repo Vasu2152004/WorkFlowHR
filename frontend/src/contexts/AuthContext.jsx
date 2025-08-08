@@ -1,11 +1,10 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
-import toast from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
 
 const AuthContext = createContext()
-
-// Backend API URL
-const API_BASE_URL = 'http://localhost:3000/api'
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -31,12 +30,9 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async () => {
     try {
-      console.log('🔄 Fetching user profile...')
       const response = await axios.get(`${API_BASE_URL}/auth/profile`)
-      console.log('✅ Profile fetched:', response.data.user)
       setUser(response.data.user)
     } catch (error) {
-      console.error('❌ Error fetching profile:', error)
       if (error.response?.status === 401) {
         logout()
       }
@@ -47,11 +43,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      console.log('🔐 Attempting login for:', email)
       const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password })
       const { access_token, refresh_token, user } = response.data
-      
-      console.log('✅ Login successful, user data:', user)
       
       localStorage.setItem('access_token', access_token)
       localStorage.setItem('refresh_token', refresh_token)
@@ -61,7 +54,6 @@ export const AuthProvider = ({ children }) => {
       toast.success('Login successful!')
       return true
     } catch (error) {
-      console.error('❌ Login failed:', error)
       toast.error(error.response?.data?.error || 'Login failed')
       return false
     }

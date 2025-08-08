@@ -66,7 +66,6 @@ const Employees = () => {
           employees = data.employees || []
         } else {
           // Fallback to mock data
-          console.log('Using mock employees data for development')
           const mockResponse = await fetch(`${API_BASE_URL}/users/mock/employees`, {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -78,7 +77,6 @@ const Employees = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching employees:', error)
         // Use mock data as fallback
         employees = [
           {
@@ -111,7 +109,6 @@ const Employees = () => {
       setEmployees(employees)
       setFilteredEmployees(employees)
     } catch (error) {
-      console.error('Error fetching employees:', error)
       toast.error('Failed to fetch employees')
     } finally {
       setLoading(false)
@@ -192,7 +189,6 @@ const Employees = () => {
       setShowDeleteModal(false)
       setEmployeeToDelete(null)
     } catch (error) {
-      console.error('Error deleting employee:', error)
       toast.error('Failed to delete employee')
     }
   }

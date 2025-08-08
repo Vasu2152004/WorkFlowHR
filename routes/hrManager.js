@@ -3,7 +3,7 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const {
   getCompanyHRs,
-  addHR,
+  addHRStaff,
   getHRManagerDashboard,
   reassignEmployee
 } = require('../controllers/hrManagerController');
@@ -15,7 +15,7 @@ router.use(authenticateToken);
 router.get('/hrs', getCompanyHRs);
 
 // Add new HR
-router.post('/hrs', addHR);
+router.post('/hrs', addHRStaff);
 
 // Get HR Manager dashboard
 router.get('/dashboard', getHRManagerDashboard);

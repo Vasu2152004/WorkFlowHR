@@ -26,7 +26,6 @@ const getWorkingDaysConfig = async (companyId) => {
 
     return config
   } catch (error) {
-    console.error('Error fetching working days config:', error)
     // Return default configuration
     return {
       working_days_per_week: 5,
@@ -95,7 +94,6 @@ const calculateWorkingDaysInMonth = async (companyId, month, year) => {
     
     return workingDays
   } catch (error) {
-    console.error('Error calculating working days in month:', error)
     // Return default calculation (22 working days)
     return 22
   }
@@ -126,42 +124,41 @@ const isWorkingDay = async (companyId, date) => {
         return false
     }
   } catch (error) {
-    console.error('Error checking if date is working day:', error)
-    // Return default (weekdays only)
-    const dayOfWeek = date.getDay()
-    return dayOfWeek >= 1 && dayOfWeek <= 5
+    // Return false if error occurs
+    return false
   }
 }
 
-// Calculate daily salary based on annual salary and working days
+// Calculate daily salary based on annual salary and working days per month
 const calculateDailySalary = (annualSalary, workingDaysPerMonth = 30) => {
-  // Always use 30 days per month for daily salary calculation (as requested)
-  // This ensures consistent daily rate regardless of actual days in the month
-  return annualSalary / (30 * 12)
+  const monthlySalary = annualSalary / 12
+  return monthlySalary / workingDaysPerMonth
 }
 
-// Calculate monthly salary based on annual salary
+// Calculate monthly salary from annual salary
 const calculateMonthlySalary = (annualSalary) => {
   return annualSalary / 12
 }
 
-// Calculate working days between two dates (excluding non-working days)
+// Calculate working days between two dates (respecting company working days)
 const calculateWorkingDaysBetween = async (companyId, startDate, endDate) => {
   try {
     const config = await getWorkingDaysConfig(companyId)
     
-    let workingDays = 0
-    const current = new Date(startDate)
+    // Ensure we're working with dates only
+    const start = new Date(startDate)
     const end = new Date(endDate)
-    
-    // Ensure we're working with dates only (no time component)
-    current.setHours(0, 0, 0, 0)
+    start.setHours(0, 0, 0, 0)
     end.setHours(0, 0, 0, 0)
+    
+    let workingDays = 0
+    const current = new Date(start)
     
     while (current <= end) {
       const dayOfWeek = current.getDay()
       let isWorkingDay = false
       
+      // Check if this day is a working day based on configuration
       switch (dayOfWeek) {
         case 1: // Monday
           isWorkingDay = config.monday_working
@@ -195,25 +192,12 @@ const calculateWorkingDaysBetween = async (companyId, startDate, endDate) => {
     
     return workingDays
   } catch (error) {
-    console.error('Error calculating working days between dates:', error)
-    // Return default calculation (excluding weekends)
-    let workingDays = 0
-    const current = new Date(startDate)
+    // Return simple calculation if error occurs
+    const start = new Date(startDate)
     const end = new Date(endDate)
-    
-    // Ensure we're working with dates only (no time component)
-    current.setHours(0, 0, 0, 0)
-    end.setHours(0, 0, 0, 0)
-    
-    while (current <= end) {
-      const dayOfWeek = current.getDay()
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        workingDays++
-      }
-      current.setDate(current.getDate() + 1)
-    }
-    
-    return workingDays
+    const diffTime = Math.abs(end - start)
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return Math.max(0, diffDays)
   }
 }
 
@@ -222,18 +206,20 @@ const calculateLeaveDays = async (companyId, startDate, endDate) => {
   try {
     const config = await getWorkingDaysConfig(companyId)
     
-    let leaveDays = 0
-    const current = new Date(startDate)
+    // Ensure we're working with dates only
+    const start = new Date(startDate)
     const end = new Date(endDate)
-    
-    // Ensure we're working with dates only (no time component)
-    current.setHours(0, 0, 0, 0)
+    start.setHours(0, 0, 0, 0)
     end.setHours(0, 0, 0, 0)
+    
+    let leaveDays = 0
+    const current = new Date(start)
     
     while (current <= end) {
       const dayOfWeek = current.getDay()
       let isWorkingDay = false
       
+      // Check if this day is a working day based on configuration
       switch (dayOfWeek) {
         case 1: // Monday
           isWorkingDay = config.monday_working
@@ -258,7 +244,6 @@ const calculateLeaveDays = async (companyId, startDate, endDate) => {
           break
       }
       
-      // Only count leave days for working days
       if (isWorkingDay) {
         leaveDays++
       }
@@ -268,25 +253,12 @@ const calculateLeaveDays = async (companyId, startDate, endDate) => {
     
     return leaveDays
   } catch (error) {
-    console.error('Error calculating leave days:', error)
-    // Return default calculation (excluding weekends)
-    let leaveDays = 0
-    const current = new Date(startDate)
+    // Return simple calculation if error occurs
+    const start = new Date(startDate)
     const end = new Date(endDate)
-    
-    // Ensure we're working with dates only (no time component)
-    current.setHours(0, 0, 0, 0)
-    end.setHours(0, 0, 0, 0)
-    
-    while (current <= end) {
-      const dayOfWeek = current.getDay()
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        leaveDays++
-      }
-      current.setDate(current.getDate() + 1)
-    }
-    
-    return leaveDays
+    const diffTime = Math.abs(end - start)
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return Math.max(0, diffDays)
   }
 }
 
@@ -296,19 +268,19 @@ const testLeaveCalculation = async (companyId, startDate, endDate, expectedWorki
     const config = await getWorkingDaysConfig(companyId)
     const leaveDays = await calculateLeaveDays(companyId, startDate, endDate)
     
-    console.log('=== Leave Calculation Test ===')
-    console.log('Company Config:', config)
-    console.log('Start Date:', startDate.toDateString())
-    console.log('End Date:', endDate.toDateString())
-    console.log('Calculated Leave Days:', leaveDays)
-    console.log('Expected Working Days:', expectedWorkingDays)
-    console.log('Test Result:', leaveDays === expectedWorkingDays ? 'PASS' : 'FAIL')
-    console.log('=============================')
-    
-    return leaveDays === expectedWorkingDays
+    return {
+      config,
+      startDate: startDate.toDateString(),
+      endDate: endDate.toDateString(),
+      calculatedLeaveDays: leaveDays,
+      expectedWorkingDays,
+      testResult: leaveDays === expectedWorkingDays ? 'PASS' : 'FAIL'
+    }
   } catch (error) {
-    console.error('Test failed:', error)
-    return false
+    return {
+      error: error.message,
+      testResult: 'FAIL'
+    }
   }
 }
 

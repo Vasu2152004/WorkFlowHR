@@ -132,10 +132,10 @@ const addEmployee = async (req, res) => {
     try {
       const emailData = {
         to: email,
-        subject: 'Welcome to HRMS - Your Account Details',
+        subject: 'Welcome to WorkFlowHR - Your Account Details',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">Welcome to HRMS!</h2>
+            <h2 style="color: #2563eb;">Welcome to WorkFlowHR!</h2>
             <p>Dear ${full_name},</p>
             <p>Your employee account has been created successfully. Here are your login credentials:</p>
             
@@ -169,10 +169,10 @@ const addEmployee = async (req, res) => {
       });
 
       if (!emailResponse.ok) {
-        console.log('Email sending failed, but employee created successfully');
+        // Email sending failed, but employee created successfully
       }
     } catch (emailError) {
-      console.log('Email functionality not available, but employee created successfully');
+      // Email functionality not available, but employee created successfully
     }
 
     res.status(201).json({
@@ -193,7 +193,6 @@ const addEmployee = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Add employee error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -202,7 +201,6 @@ const addEmployee = async (req, res) => {
 const getEmployees = async (req, res) => {
   try {
     const currentUser = req.user;
-    console.log('🔍 getEmployees - User:', currentUser.full_name, 'Role:', currentUser.role, 'Company ID:', currentUser.company_id);
 
     // Build base query with proper joins
     let query = supabaseAdmin
@@ -218,31 +216,26 @@ const getEmployees = async (req, res) => {
     switch (currentUser.role) {
       case 'admin':
         // Admin can see all employees in their company only
-        console.log('🔍 getEmployees - Admin user, filtering by company_id:', currentUser.company_id);
         query = query.eq('company_id', currentUser.company_id);
         break;
         
       case 'hr_manager':
         // HR Manager can see all employees in their company
-        console.log('🔍 getEmployees - HR Manager, filtering by company_id:', currentUser.company_id);
         query = query.eq('company_id', currentUser.company_id);
         break;
         
       case 'hr':
         // HR can see employees in their company
-        console.log('🔍 getEmployees - HR user, filtering by company_id:', currentUser.company_id);
         query = query.eq('company_id', currentUser.company_id);
         break;
         
       case 'team_lead':
         // Team Lead can see their team members
-        console.log('🔍 getEmployees - Team Lead, filtering by team_lead_id:', currentUser.id);
         query = query.eq('team_lead_id', currentUser.id);
         break;
         
       case 'employee':
         // Employee can only see their own data
-        console.log('🔍 getEmployees - Employee, filtering by user_id:', currentUser.id);
         query = query.eq('user_id', currentUser.id);
         break;
         
@@ -253,37 +246,19 @@ const getEmployees = async (req, res) => {
     const { data: employees, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Get employees error:', error);
       return res.status(500).json({ error: error.message });
-    }
-
-    console.log('🔍 getEmployees - Found employees:', employees?.length || 0);
-    if (employees && employees.length > 0) {
-      employees.forEach(emp => {
-        console.log(`  - ${emp.full_name} (${emp.email}) - Company: ${emp.company_id}`);
-      });
     }
 
     // Transform the data to include user information
     const transformedEmployees = employees.map(emp => ({
       ...emp,
       user: emp.users,
-      team_lead_info: emp.team_lead,
-      creator_info: emp.creator,
-      // Remove the nested objects to avoid duplication
-      users: undefined,
-      team_lead: undefined,
-      creator: undefined
+      team_lead: emp.team_lead,
+      creator: emp.creator
     }));
 
-    res.json({ 
-      employees: transformedEmployees,
-      total: transformedEmployees.length,
-      user_role: currentUser.role,
-      company_id: currentUser.company_id
-    });
+    res.json({ employees: transformedEmployees });
   } catch (error) {
-    console.error('Get employees error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -332,7 +307,6 @@ const getEmployee = async (req, res) => {
 
     res.json({ employee });
   } catch (error) {
-    console.error('Get employee error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -420,7 +394,6 @@ const updateEmployee = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update employee error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -470,7 +443,6 @@ const deleteEmployee = async (req, res) => {
     if (existingEmployee.user_id) {
       const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(existingEmployee.user_id);
       if (authError) {
-        console.error('Auth deletion error:', authError);
         // Continue even if auth deletion fails, as the employee record is already deleted
       }
     }
@@ -478,7 +450,6 @@ const deleteEmployee = async (req, res) => {
     res.json({ message: 'Employee deleted successfully' });
 
   } catch (error) {
-    console.error('Delete employee error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -535,7 +506,6 @@ const resetEmployeePassword = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Reset employee password error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -543,7 +513,6 @@ const resetEmployeePassword = async (req, res) => {
 // Get company profile (accessible by all authenticated users)
 const getCompanyProfile = async (req, res) => {
   try {
-    console.log('🔍 getCompanyProfile - User company_id:', req.user.company_id);
     
     let { data: company, error } = await supabaseAdmin
       .from('companies')
@@ -551,10 +520,7 @@ const getCompanyProfile = async (req, res) => {
       .eq('id', req.user.company_id)
       .single();
 
-    console.log('🔍 getCompanyProfile - Query result:', company ? 'Found' : 'Not found', error?.message);
-
     if (error || !company) {
-      console.log('🔍 getCompanyProfile - Company not found, creating default...');
       
       // Create a default company profile
       const { data: newCompany, error: createError } = await supabaseAdmin
@@ -571,17 +537,14 @@ const getCompanyProfile = async (req, res) => {
         .single();
 
       if (createError) {
-        console.error('🔍 getCompanyProfile - Error creating company:', createError);
         return res.status(500).json({ error: 'Failed to create company profile' });
       }
 
       company = newCompany;
-      console.log('🔍 getCompanyProfile - Default company created');
     }
 
     res.json({ company });
   } catch (error) {
-    console.error('Get company profile error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -641,7 +604,6 @@ const updateCompanyProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update company profile error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -649,7 +611,6 @@ const updateCompanyProfile = async (req, res) => {
 // Get employees for viewing (accessible by all authenticated users)
 const getEmployeesForViewing = async (req, res) => {
   try {
-    console.log('🔍 getEmployeesForViewing - User:', req.user.full_name, 'Company ID:', req.user.company_id);
     
     const { data: employees, error } = await supabase
       .from('employees')
@@ -658,20 +619,11 @@ const getEmployeesForViewing = async (req, res) => {
       .order('full_name', { ascending: true });
 
     if (error) {
-      console.error('🔍 getEmployeesForViewing - Error:', error);
       return res.status(500).json({ error: 'Failed to fetch employees' });
-    }
-
-    console.log('🔍 getEmployeesForViewing - Found employees:', employees?.length || 0);
-    if (employees && employees.length > 0) {
-      employees.forEach(emp => {
-        console.log(`  - ${emp.full_name} (${emp.email}) - Company: ${emp.company_id}`);
-      });
     }
 
     res.json({ employees });
   } catch (error) {
-    console.error('Get employees for viewing error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

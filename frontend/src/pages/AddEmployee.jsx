@@ -240,7 +240,6 @@ export default function AddEmployee() {
       toast.success('Employee created successfully! Welcome email sent.')
 
     } catch (error) {
-      console.error('Error creating employee:', error)
       setError(error.message || 'Failed to create employee')
       toast.error(error.message || 'Failed to create employee')
     } finally {

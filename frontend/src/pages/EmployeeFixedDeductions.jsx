@@ -67,7 +67,6 @@ export default function EmployeeFixedDeductions() {
       }
 
     } catch (error) {
-      console.error('Error fetching data:', error)
       toast.error('Failed to fetch data')
     } finally {
       setLoading(false)
@@ -115,7 +114,6 @@ export default function EmployeeFixedDeductions() {
       })
       fetchData()
     } catch (error) {
-      console.error('Error adding fixed deduction:', error)
       toast.error(error.message || 'Failed to add fixed deduction')
     }
   }
@@ -155,7 +153,6 @@ export default function EmployeeFixedDeductions() {
       })
       fetchData()
     } catch (error) {
-      console.error('Error updating fixed deduction:', error)
       toast.error(error.message || 'Failed to update fixed deduction')
     }
   }
@@ -178,15 +175,15 @@ export default function EmployeeFixedDeductions() {
         }
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const result = await response.json()
         throw new Error(result.error || 'Failed to delete fixed deduction')
       }
 
       toast.success('Fixed deduction deleted successfully!')
       fetchData()
     } catch (error) {
-      console.error('Error deleting fixed deduction:', error)
       toast.error(error.message || 'Failed to delete fixed deduction')
     }
   }

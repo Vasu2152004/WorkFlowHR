@@ -54,11 +54,11 @@ const Signup = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full mb-4">
             <Building className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-2">
             Create Account
           </h2>
-          <p className="text-slate-600 dark:text-gray-300 mt-2">
-            Join our HRMS platform
+          <p className="text-gray-600 dark:text-gray-400 text-center mb-8">
+            Join our WorkFlowHR platform
           </p>
         </div>
 

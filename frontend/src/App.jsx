@@ -19,6 +19,7 @@ import SalarySlips from './pages/SalarySlips'
 import EmployeeFixedDeductions from './pages/EmployeeFixedDeductions'
 import CreateTemplate from './pages/CreateTemplate'
 import GenerateDocument from './pages/GenerateDocument'
+import EditTemplate from './pages/EditTemplate'
 import CompanyCalendar from './pages/CompanyCalendar'
 
 function App() {
@@ -119,6 +120,14 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <GenerateDocument />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/edit-template/:id" element={
+            <ProtectedRoute>
+              <Layout>
+                <EditTemplate />
               </Layout>
             </ProtectedRoute>
           } />

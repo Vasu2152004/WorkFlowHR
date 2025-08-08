@@ -9,7 +9,7 @@ try {
   require('dotenv').config()
   
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-         transporter = nodemailer.createTransport({
+    transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
@@ -65,12 +65,12 @@ const emailTemplates = {
       
       <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-top: 20px;">
         <p style="margin: 0; color: #1e40af;">
-          <strong>Action Required:</strong> Please review and approve/reject this leave request through the HRMS system.
+          <strong>Action Required:</strong> Please review and approve/reject this leave request through the WorkFlowHR system.
         </p>
       </div>
       
       <div style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
-        <p>This is an automated notification from the HRMS system.</p>
+        <p>This is an automated notification from the WorkFlowHR system.</p>
       </div>
     </div>
   `,
@@ -122,12 +122,12 @@ const emailTemplates = {
       
       <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-top: 20px;">
         <p style="margin: 0; color: #1e40af;">
-          <strong>Next Steps:</strong> You can view the complete details of your leave request in the HRMS system.
+          <strong>Next Steps:</strong> You can view the complete details of your leave request in the WorkFlowHR system.
         </p>
       </div>
       
       <div style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
-        <p>This is an automated notification from the HRMS system.</p>
+        <p>This is an automated notification from the WorkFlowHR system.</p>
       </div>
     </div>
   `,
@@ -170,12 +170,12 @@ const emailTemplates = {
           <strong>📎 PDF Attachment:</strong> Your complete salary slip has been attached to this email as a PDF document.
         </p>
         <p style="margin: 10px 0 0 0; color: #1e40af;">
-          <strong>Access Your Salary Slip:</strong> You can also view and download your salary slip from your employee dashboard in the HRMS system.
+          <strong>Access Your Salary Slip:</strong> You can also view and download your salary slip from your employee dashboard in the WorkFlowHR system.
         </p>
       </div>
       
       <div style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
-        <p>This is an automated notification from the HRMS system.</p>
+        <p>This is an automated notification from the WorkFlowHR system.</p>
       </div>
     </div>
   `

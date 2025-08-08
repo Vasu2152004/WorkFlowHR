@@ -3,12 +3,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { Link } from 'react-router-dom'
 import { 
   Users, 
-  TrendingUp, 
+  Clock, 
   Calendar, 
-  DollarSign,
-  Building,
-  Clock,
   FileText,
+  Building,
+  DollarSign,
   Bell,
   Plus,
   RefreshCw
@@ -21,9 +20,9 @@ const Dashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [dashboardData, setDashboardData] = useState({
     totalEmployees: 0,
-    activeProjects: 0,
-    leaveRequests: 0, // Fixed: Added default value
-    totalPayroll: 0,
+    pendingLeaveRequests: 0,
+    leaveRequests: 0,
+    salarySlipsGenerated: 0,
     recentEmployees: [],
     companyInfo: null
   })
@@ -46,8 +45,6 @@ const Dashboard = () => {
         return
       }
 
-      console.log('🔍 Fetching dashboard data...')
-
       // Fetch dashboard data from centralized endpoint
       const dashboardResponse = await fetch(`${API_BASE_URL}/users/dashboard`, {
         headers: {
@@ -55,26 +52,20 @@ const Dashboard = () => {
         }
       })
 
-      console.log('🔍 Dashboard response status:', dashboardResponse.status)
-
       if (dashboardResponse.ok) {
         const dashboardData = await dashboardResponse.json()
-        console.log('🔍 Dashboard data received:', dashboardData)
         
         // Update state with dashboard data
         setDashboardData({
           totalEmployees: dashboardData.stats?.totalEmployees || 0,
-          activeProjects: dashboardData.stats?.activeProjects || 0,
+          pendingLeaveRequests: dashboardData.stats?.pendingLeaveRequests || 0,
           leaveRequests: dashboardData.stats?.leaveRequests || 0,
-          totalPayroll: dashboardData.stats?.totalPayroll || 0,
+          salarySlipsGenerated: dashboardData.stats?.salarySlipsGenerated || 0,
           recentEmployees: dashboardData.recentEmployees || [],
           companyInfo: dashboardData.companyInfo || null
         })
       } else {
         // Fallback to individual endpoints if dashboard fails
-        console.log('Dashboard endpoint failed, using fallback...')
-        
-        // Try to fetch employees from main endpoint first
         let employees = []
         try {
           const employeesResponse = await fetch(`${API_BASE_URL}/users/employees`, {
@@ -88,7 +79,6 @@ const Dashboard = () => {
             employees = employeesData.employees || []
           } else {
             // Fallback to mock data
-            console.log('Using mock employees data for development')
             const mockResponse = await fetch(`${API_BASE_URL}/users/mock/employees`, {
               headers: {
                 'Authorization': `Bearer ${token}`
@@ -100,7 +90,6 @@ const Dashboard = () => {
             }
           }
         } catch (error) {
-          console.error('Error fetching employees:', error)
           // Use mock data as fallback
           employees = [
             {
@@ -128,6 +117,43 @@ const Dashboard = () => {
           ]
         }
 
+        // Fetch pending leave requests
+        let pendingLeaveRequests = 0
+        try {
+          const leaveResponse = await fetch(`${API_BASE_URL}/leaves/requests?status=pending`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (leaveResponse.ok) {
+            const leaveData = await leaveResponse.json()
+            pendingLeaveRequests = Array.isArray(leaveData) ? leaveData.length : 0
+          }
+        } catch (error) {
+          // Continue with 0 if leave requests fail
+        }
+
+        // Fetch salary slips generated this month
+        let salarySlipsGenerated = 0
+        try {
+          const currentMonth = new Date().getMonth() + 1
+          const currentYear = new Date().getFullYear()
+          const salaryResponse = await fetch(`${API_BASE_URL}/salary/all`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (salaryResponse.ok) {
+            const salaryData = await salaryResponse.json()
+            const currentMonthSlips = (salaryData.salarySlips || []).filter(slip => 
+              slip.month === currentMonth && slip.year === currentYear
+            )
+            salarySlipsGenerated = currentMonthSlips.length
+          }
+        } catch (error) {
+          // Continue with 0 if salary slips fail
+        }
+
         // Fetch company profile
         let companyInfo = null
         try {
@@ -153,7 +179,6 @@ const Dashboard = () => {
             }
           }
         } catch (error) {
-          console.error('Error fetching company profile:', error)
           // Use mock company data as fallback
           companyInfo = {
             name: 'Test Company Ltd.',
@@ -166,7 +191,6 @@ const Dashboard = () => {
 
         // Calculate dashboard metrics
         const totalEmployees = employees.length
-        const totalPayroll = employees.reduce((sum, emp) => sum + (emp.salary || 0), 0)
         
         // Get recent employees (last 5)
         const recentEmployees = employees
@@ -175,9 +199,9 @@ const Dashboard = () => {
 
         setDashboardData({
           totalEmployees,
-          activeProjects: 0, // Placeholder - can be expanded later
+          pendingLeaveRequests,
           leaveRequests: 0,
-          totalPayroll,
+          salarySlipsGenerated,
           recentEmployees,
           companyInfo: companyInfo ? {
             name: companyInfo.name,
@@ -188,7 +212,6 @@ const Dashboard = () => {
         })
       }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
       toast.error('Failed to fetch dashboard data')
     } finally {
       setLoading(false)
@@ -206,8 +229,6 @@ const Dashboard = () => {
     toast.success('Dashboard refreshed!')
   }
 
-  console.log('🔍 Current dashboardData:', dashboardData)
-
   const stats = [
     {
       name: 'Total Employees',
@@ -218,12 +239,12 @@ const Dashboard = () => {
       color: 'from-blue-600 to-blue-700'
     },
     {
-      name: 'Active Projects',
-      value: (dashboardData.activeProjects || 0).toString(),
+      name: 'Pending Leave Requests',
+      value: (dashboardData.pendingLeaveRequests || 0).toString(),
       change: '+0%',
       changeType: 'neutral',
-      icon: TrendingUp,
-      color: 'from-emerald-600 to-emerald-700'
+      icon: Clock,
+      color: 'from-amber-600 to-amber-700'
     },
     {
       name: 'Leave Requests',
@@ -231,18 +252,14 @@ const Dashboard = () => {
       change: '+0%',
       changeType: 'neutral',
       icon: Calendar,
-      color: 'from-amber-600 to-amber-700'
+      color: 'from-emerald-600 to-emerald-700'
     },
     {
-      name: 'Total Payroll',
-      value: new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        minimumFractionDigits: 0
-      }).format(dashboardData.totalPayroll || 0),
+      name: 'Salary Slips Generated',
+      value: (dashboardData.salarySlipsGenerated || 0).toString(),
       change: '+0%',
       changeType: 'neutral',
-      icon: DollarSign,
+      icon: FileText,
       color: 'from-cyan-600 to-cyan-700'
     }
   ]
@@ -283,40 +300,53 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white">
-        <h1 className="text-2xl font-bold dark:text-white">HR DASHBOARD</h1>
-        <p className="text-blue-100 dark:text-gray-300">
-          Welcome to your HR Management System
-        </p>
-      </div>
-
-      {/* Debug Info */}
-      <div className="bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-lg p-4">
-        <p className="text-blue-700 dark:text-blue-300 text-sm">
-          <strong>Debug Info:</strong> Current time: {currentTime.toLocaleTimeString()} | 
-          User role: HR Manager | Session active
-        </p>
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">WorkFlowHR Dashboard</h1>
+            <p className="text-blue-100 text-lg">
+              Welcome to your Human Resource Management System
+            </p>
+            <p className="text-blue-200 text-sm mt-2">
+              {currentTime.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })} • {currentTime.toLocaleTimeString()}
+            </p>
+          </div>
+          <div className="mt-4 sm:mt-0">
+            <button
+              onClick={handleRefresh}
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 backdrop-blur-sm"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => (
-          <div key={stat.name} className="stats-card card-hover">
+          <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-black dark:text-gray-400">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                   {stat.name}
                 </p>
-                <p className="text-2xl font-bold text-black dark:text-white">
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
                   {loading ? (
-                    <div className="loading-spinner h-6 w-6"></div>
+                    <div className="loading-spinner h-8 w-8"></div>
                   ) : (
                     stat.value
                   )}
                 </p>
-                <p className={`text-sm ${
+                <p className={`text-sm mt-1 ${
                   stat.changeType === 'positive' 
                     ? 'text-emerald-600 dark:text-emerald-400' 
                     : stat.changeType === 'negative'
@@ -326,8 +356,8 @@ const Dashboard = () => {
                   {stat.change} from last month
                 </p>
               </div>
-              <div className={`p-3 rounded-lg bg-gradient-to-r ${stat.color}`}>
-                <stat.icon className="h-6 w-6 text-white" />
+              <div className={`p-4 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
+                <stat.icon className="h-8 w-8 text-white" />
               </div>
             </div>
           </div>
@@ -335,149 +365,149 @@ const Dashboard = () => {
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Company Information */}
-        <div className="card p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-black dark:text-white">
-              Company Information
-            </h3>
-            <button
-              onClick={handleRefresh}
-              className="btn-secondary flex items-center"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </button>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Company Information
+              </h3>
+            </div>
           </div>
-          {dashboardData.companyInfo ? (
-            <div className="space-y-3">
-              <div className="flex items-center text-black dark:text-gray-400">
-                <Building className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-                <span>{dashboardData.companyInfo?.name || 'Your Company Name'}</span>
+          <div className="p-6">
+            {dashboardData.companyInfo ? (
+              <div className="space-y-4">
+                <div className="flex items-center text-gray-700 dark:text-gray-300">
+                  <Building className="h-5 w-5 mr-3 text-blue-500" />
+                  <span className="font-medium">{dashboardData.companyInfo?.name || 'Your Company Name'}</span>
+                </div>
+                <div className="flex items-center text-gray-700 dark:text-gray-300">
+                  <Clock className="h-5 w-5 mr-3 text-green-500" />
+                  <span>Established: {dashboardData.companyInfo?.established || '[Year]'}</span>
+                </div>
+                <div className="flex items-center text-gray-700 dark:text-gray-300">
+                  <Users className="h-5 w-5 mr-3 text-purple-500" />
+                  <span>{dashboardData.totalEmployees} Employees</span>
+                </div>
+                <div className="flex items-center text-gray-700 dark:text-gray-300">
+                  <DollarSign className="h-5 w-5 mr-3 text-yellow-500" />
+                  <span>Status: Active</span>
+                </div>
+                <div className="flex items-center text-gray-700 dark:text-gray-300">
+                  <Building className="h-5 w-5 mr-3 text-indigo-500" />
+                  <span>Location: {dashboardData.companyInfo?.location || 'Not specified'}</span>
+                </div>
               </div>
-              <div className="flex items-center text-black dark:text-gray-400">
-                <Clock className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-                <span>Established: {dashboardData.companyInfo?.established || '[Year]'}</span>
+            ) : (
+              <div className="text-center py-8">
+                <Building className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-400 mb-4 text-lg">
+                  Company profile not set up yet
+                </p>
+                <Link
+                  to="/company-profile"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Set Up Company Profile
+                </Link>
               </div>
-              <div className="flex items-center text-black dark:text-gray-400">
-                <Users className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-                <span>{dashboardData.totalEmployees} Employees</span>
-              </div>
-              <div className="flex items-center text-black dark:text-gray-400">
-                <DollarSign className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-                <span>Annual Revenue: {new Intl.NumberFormat('en-IN', {
-                  style: 'currency',
-                  currency: 'INR',
-                  minimumFractionDigits: 0
-                }).format(dashboardData.companyInfo?.revenue || 0)}</span>
-              </div>
-              <div className="flex items-center text-black dark:text-gray-400">
-                <Building className="h-4 w-4 mr-3 text-slate-500 dark:text-gray-500" />
-                <span>Location: {dashboardData.companyInfo?.location || 'Not specified'}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <Building className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600 dark:text-gray-400 mb-3">
-                Company profile not set up yet
-              </p>
-              <a
-                href="/company-profile"
-                className="btn-primary inline-flex items-center"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Set Up Company Profile
-              </a>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
-            Quick Actions
-          </h3>
-          <div className="space-y-3">
-            {quickActions.map((action) => (
-              <Link
-                key={action.name}
-                to={action.href}
-                className="w-full flex items-center p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors"
-              >
-                <div className={`p-2 rounded-lg bg-gradient-to-r ${action.color} mr-3`}>
-                  <action.icon className="h-5 w-5 text-white" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-black dark:text-white">
-                    {action.name}
-                  </p>
-                  <p className="text-sm text-black dark:text-gray-400">
-                    {action.description}
-                  </p>
-                </div>
-              </Link>
-            ))}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Quick Actions
+            </h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {quickActions.map((action) => (
+                <Link
+                  key={action.name}
+                  to={action.href}
+                  className="block p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 hover:shadow-md bg-gray-50 dark:bg-gray-700 hover:bg-white dark:hover:bg-gray-600"
+                >
+                  <div className="flex items-center">
+                    <div className={`p-3 rounded-lg bg-gradient-to-r ${action.color} mr-4 shadow-lg`}>
+                      <action.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {action.name}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {action.description}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Calendar Widget */}
-      <div className="mt-6">
-        <CalendarWidget limit={3} />
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Upcoming Events
+          </h3>
+        </div>
+        <div className="p-6">
+          <CalendarWidget limit={3} />
+        </div>
       </div>
 
       {/* Recent Employees */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
-          Recent Employees
-        </h3>
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="loading-spinner h-8 w-8"></div>
-          </div>
-        ) : dashboardData.recentEmployees.length === 0 ? (
-          <div className="text-center py-8">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-black dark:text-gray-400">No employees yet</p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Employees will appear here once added to the system</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dashboardData.recentEmployees.map((employee) => (
-              <div key={employee.id} className="card p-4 hover:shadow-medium transition-all duration-300">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center text-white font-semibold mr-3">
-                    {employee.full_name?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {employee.full_name}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {employee.department}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      Joined: {formatDate(employee.created_at)}
-                    </p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Recent Employees
+          </h3>
+        </div>
+        <div className="p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="loading-spinner h-8 w-8"></div>
+            </div>
+          ) : dashboardData.recentEmployees.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 dark:text-gray-400 text-lg">No employees yet</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                Employees will appear here once added to the system
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {dashboardData.recentEmployees.map((employee) => (
+                <div key={employee.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center text-white font-semibold text-lg mr-4">
+                      {employee.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {employee.full_name}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {employee.department}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">
+                        Joined: {formatDate(employee.created_at)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Recent Activity */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
-          Recent Activity
-        </h3>
-        <div className="text-center py-8">
-          <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-black dark:text-gray-400">No recent activity</p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Activities will appear here once you start using the system</p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

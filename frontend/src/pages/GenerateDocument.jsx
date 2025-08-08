@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import { 
   FileText,
   Download,
@@ -9,12 +10,16 @@ import {
   AlertCircle,
   Loader2,
   FileDown,
-  RefreshCw
+  RefreshCw,
+  Edit,
+  Trash2,
+  Plus
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
 const GenerateDocument = () => {
-  const { user } = useAuth()
+  const { user, API_BASE_URL } = useAuth()
+  const navigate = useNavigate()
   const [templates, setTemplates] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [fieldValues, setFieldValues] = useState({})
@@ -24,6 +29,7 @@ const GenerateDocument = () => {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [deletingTemplate, setDeletingTemplate] = useState(null)
 
   // Fetch available templates
   useEffect(() => {
@@ -33,10 +39,19 @@ const GenerateDocument = () => {
   const fetchTemplates = async () => {
     try {
       setLoading(true)
+      setError('')
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/documents/templates', {
+      
+      if (!token) {
+        setError('No authentication token found')
+        toast.error('Please login again')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/documents/templates`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       })
 
@@ -45,15 +60,23 @@ const GenerateDocument = () => {
           toast.error('Session expired. Please login again.')
           return
         }
-        throw new Error('Failed to fetch templates')
+        if (response.status === 403) {
+          setError('Access denied. You need HR permissions to view templates.')
+          toast.error('Access denied. You need HR permissions to view templates.')
+          return
+        }
+        throw new Error(`Failed to fetch templates: ${response.status}`)
       }
 
       const data = await response.json()
       setTemplates(data.templates || [])
+      
+      if (data.templates && data.templates.length === 0) {
+        setError('No templates found. Create some templates first.')
+      }
     } catch (error) {
-      console.error('Error fetching templates:', error)
-      setError('Failed to load templates')
-      toast.error('Failed to load templates')
+      setError(error.message || 'Failed to load templates')
+      toast.error(error.message || 'Failed to load templates')
     } finally {
       setLoading(false)
     }
@@ -96,7 +119,6 @@ const GenerateDocument = () => {
       setPreviewContent(preview)
       setIsPreviewMode(true)
     } catch (error) {
-      console.error('Error generating preview:', error)
       toast.error('Error generating preview')
     }
   }
@@ -129,7 +151,7 @@ const GenerateDocument = () => {
       setError('')
       
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/documents/generate', {
+      const response = await fetch(`${API_BASE_URL}/documents/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,6 +166,11 @@ const GenerateDocument = () => {
       if (!response.ok) {
         if (response.status === 401) {
           toast.error('Session expired. Please login again.')
+          return
+        }
+        if (response.status === 403) {
+          setError('Access denied. You need HR permissions to generate documents.')
+          toast.error('Access denied. You need HR permissions to generate documents.')
           return
         }
         const errorData = await response.json()
@@ -164,7 +191,6 @@ const GenerateDocument = () => {
       setSuccess('Document generated and downloaded successfully!')
       toast.success('Document generated successfully!')
     } catch (error) {
-      console.error('Error generating PDF:', error)
       setError(error.message || 'Failed to generate document')
       toast.error(error.message || 'Failed to generate document')
     } finally {
@@ -177,8 +203,53 @@ const GenerateDocument = () => {
     setFieldValues({})
     setPreviewContent('')
     setIsPreviewMode(false)
-    setError('')
-    setSuccess('')
+  }
+
+  const handleEditTemplate = (template) => {
+    navigate(`/edit-template/${template.id}`)
+  }
+
+  const handleDeleteTemplate = async (template) => {
+    if (!confirm(`Are you sure you want to delete "${template.document_name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      setDeletingTemplate(template.id)
+      const token = localStorage.getItem('access_token')
+      const response = await fetch(`${API_BASE_URL}/documents/templates/${template.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please login again.')
+          return
+        }
+        if (response.status === 403) {
+          toast.error('Access denied. You need HR permissions to delete templates.')
+          return
+        }
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete template')
+      }
+
+      toast.success('Template deleted successfully!')
+      fetchTemplates() // Refresh the templates list
+      
+      // If the deleted template was selected, reset the form
+      if (selectedTemplate && selectedTemplate.id === template.id) {
+        resetForm()
+      }
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete template')
+    } finally {
+      setDeletingTemplate(null)
+    }
   }
 
   if (!user || user.role !== 'hr') {
@@ -243,8 +314,7 @@ const GenerateDocument = () => {
                 {templates.map((template) => (
                   <div
                     key={template.id}
-                    onClick={() => handleTemplateSelect(template)}
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                    className={`p-4 border-2 rounded-lg transition-all duration-200 ${
                       selectedTemplate?.id === template.id
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                         : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
@@ -254,16 +324,48 @@ const GenerateDocument = () => {
                       <h4 className="font-medium text-gray-900 dark:text-white">
                         {template.document_name}
                       </h4>
-                      {selectedTemplate?.id === template.id && (
-                        <CheckCircle className="h-5 w-5 text-blue-600" />
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {selectedTemplate?.id === template.id && (
+                          <CheckCircle className="h-5 w-5 text-blue-600" />
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEditTemplate(template)
+                          }}
+                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Edit template"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteTemplate(template)
+                          }}
+                          disabled={deletingTemplate === template.id}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                          title="Delete template"
+                        >
+                          {deletingTemplate === template.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {template.field_tags.length} dynamic field{template.field_tags.length !== 1 ? 's' : ''}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Created: {new Date(template.created_at).toLocaleDateString()}
-                    </p>
+                    <div
+                      onClick={() => handleTemplateSelect(template)}
+                      className="cursor-pointer"
+                    >
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {template.field_tags.length} dynamic field{template.field_tags.length !== 1 ? 's' : ''}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Created: {new Date(template.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>

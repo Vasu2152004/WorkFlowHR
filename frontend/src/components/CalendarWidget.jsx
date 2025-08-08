@@ -48,12 +48,9 @@ const CalendarWidget = ({ limit = 5 }) => {
           .slice(0, limit)
         setEvents(sortedEvents)
       } else {
-        const errorData = await response.text()
-        console.error('Failed to fetch calendar events:', response.status, errorData)
         setError(`Failed to fetch events: ${response.status}`)
       }
     } catch (error) {
-      console.error('Error fetching calendar events:', error)
       setError('Network error while fetching events')
     } finally {
       setLoading(false)
