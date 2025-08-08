@@ -3,6 +3,12 @@ const react = require('@vitejs/plugin-react')
 
 module.exports = defineConfig({
   plugins: [react()],
+  base: '/',
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false
+  },
   server: {
     port: 3001,
     proxy: {
