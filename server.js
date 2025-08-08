@@ -14,6 +14,7 @@ const teamLeadRoutes = require('./routes/teamLead');
 const hrManagerRoutes = require('./routes/hrManager');
 const salaryRoutes = require('./routes/salary');
 const workingDaysRoutes = require('./routes/workingDays');
+const companyCalendarRoutes = require('./routes/companyCalendar');
 
 // Optional email routes
 let emailRoutes = null;
@@ -72,6 +73,7 @@ app.use('/api/team-lead', teamLeadRoutes);
 app.use('/api/hr-manager', hrManagerRoutes);
 app.use('/api/salary', salaryRoutes);
 app.use('/api/working-days', workingDaysRoutes);
+app.use('/api/company-calendar', companyCalendarRoutes);
 if (emailRoutes) {
   app.use('/api', emailRoutes);
 }

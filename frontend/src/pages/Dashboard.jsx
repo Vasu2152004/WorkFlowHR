@@ -14,6 +14,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import CalendarWidget from '../components/CalendarWidget'
 
 const Dashboard = () => {
   const { user, API_BASE_URL } = useAuth()
@@ -420,6 +421,11 @@ const Dashboard = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Calendar Widget */}
+      <div className="mt-6">
+        <CalendarWidget limit={3} />
       </div>
 
       {/* Recent Employees */}

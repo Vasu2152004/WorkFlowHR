@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import React from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -9,15 +10,16 @@ import Dashboard from './pages/Dashboard'
 import EmployeeDashboard from './pages/EmployeeDashboard'
 import Employees from './pages/Employees'
 import AddEmployee from './pages/AddEmployee'
+import AddHRStaff from './pages/AddHRStaff'
 import Profile from './pages/Profile'
 import CompanyProfile from './pages/CompanyProfile'
-import CreateTemplate from './pages/CreateTemplate'
-import GenerateDocument from './pages/GenerateDocument'
-import LeaveRequest from './pages/LeaveRequest'
 import LeaveManagement from './pages/LeaveManagement'
-import AddHRStaff from './pages/AddHRStaff'
+import LeaveRequest from './pages/LeaveRequest'
 import SalarySlips from './pages/SalarySlips'
 import EmployeeFixedDeductions from './pages/EmployeeFixedDeductions'
+import CreateTemplate from './pages/CreateTemplate'
+import GenerateDocument from './pages/GenerateDocument'
+import CompanyCalendar from './pages/CompanyCalendar'
 
 function App() {
   return (
@@ -149,6 +151,14 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <EmployeeFixedDeductions />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/company-calendar" element={
+            <ProtectedRoute>
+              <Layout>
+                <CompanyCalendar />
               </Layout>
             </ProtectedRoute>
           } />

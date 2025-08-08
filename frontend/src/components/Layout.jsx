@@ -11,7 +11,8 @@ import {
   Sun,
   Moon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Calendar
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -55,6 +56,7 @@ const Layout = ({ children }) => {
     { name: 'Generate Documents', href: '/generate-document', icon: '📋', hrOnly: true },
     { name: 'Leave Request', href: '/leave-request', icon: '📅', employeeOnly: true },
     { name: 'Leave Management', href: '/leave-management', icon: '📋', hrOnly: true },
+    { name: 'Company Calendar', href: '/company-calendar', icon: '📅' },
     { name: 'Company Profile', href: '/company-profile', icon: '🏢' },
     { name: 'Profile', href: '/profile', icon: '👤' },
   ]
