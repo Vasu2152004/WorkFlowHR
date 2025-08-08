@@ -95,11 +95,6 @@ app.use((req, res, next) => {
   next()
 })
 
-// Serve static files from the React app
-app.use(express.static(path.join(__dirname, 'frontend/dist'), {
-  maxAge: NODE_ENV === 'production' ? '1y' : '0'
-}))
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
@@ -127,10 +122,34 @@ if (emailRoutes) {
   app.use('/api/email', emailRoutes)
 }
 
-// Catch all handler: send back React's index.html file for any non-API routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend/dist/index.html'))
-})
+// Serve static files from the React app (if available)
+const frontendPath = path.join(__dirname, 'frontend/dist')
+if (require('fs').existsSync(frontendPath)) {
+  app.use(express.static(frontendPath, {
+    maxAge: NODE_ENV === 'production' ? '1y' : '0'
+  }))
+  
+  // Catch all handler: send back React's index.html file for any non-API routes
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'))
+  })
+} else {
+  // If no frontend build, just return API info
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'WorkFlowHR API Server',
+      version: '1.0.0',
+      endpoints: {
+        health: '/health',
+        auth: '/api/auth',
+        users: '/api/users',
+        leaves: '/api/leaves',
+        documents: '/api/documents',
+        salary: '/api/salary'
+      }
+    })
+  })
+}
 
 // Global error handler
 app.use((error, req, res, next) => {
@@ -177,4 +196,6 @@ app.listen(PORT, () => {
   console.log(`🚀 WorkFlowHR server running on port ${PORT} in ${NODE_ENV} mode`)
   console.log(`📊 Health check available at: http://localhost:${PORT}/health`)
   console.log(`🔗 API base URL: http://localhost:${PORT}/api`)
-}) 
+})
+
+module.exports = app 
