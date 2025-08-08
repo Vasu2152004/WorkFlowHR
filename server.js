@@ -88,7 +88,7 @@ try {
 
 // Serve static files from the React app (if available)
 try {
-  const frontendPath = path.join(__dirname, 'dist')
+  const frontendPath = path.join(__dirname, 'frontend', 'dist')
   if (require('fs').existsSync(frontendPath)) {
     app.use(express.static(frontendPath))
     
