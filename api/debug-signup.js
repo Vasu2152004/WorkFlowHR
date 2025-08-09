@@ -92,24 +92,31 @@ export default async function handler(req, res) {
       // Use your existing user ID as the creator (for foreign key constraint)
       const creatorUserId = '84c5a3ad-4d6d-417e-a730-85ea8c85d98a' // Your user ID
 
-      // Try to create user WITHOUT explicit ID (let database handle it)
-      const { data: newUser, error: createError } = await supabase
+      // Get an existing user ID from database to understand the ID format
+      const { data: existingUsers, error: fetchError } = await supabase
         .from('users')
-        .insert([
-          {
-            email: email.toLowerCase(),
-            password: password,
-            full_name: full_name,
-            role: 'admin',
-            company_id: testCompanyId,
-            created_by: creatorUserId, // Foreign key to satisfy constraint
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ])
-        .select()
-        .single()
+        .select('id')
+        .limit(5)
+
+      console.log('Existing user IDs:', existingUsers?.map(u => u.id))
+
+      // Use one of the existing user IDs that actually exist in the database
+      const safeUserId = existingUsers?.[0]?.id || creatorUserId
+
+      // DEBUGGING: Let's see what works in your local vs. production
+      return res.status(200).json({
+        debug_info: 'Database schema analysis',
+        local_vs_production: 'Your signup works locally but fails on Vercel',
+        database_constraints: {
+          id_required: true,
+          id_foreign_key: 'users_id_fkey exists',
+          created_by_required: true
+        },
+        existing_user_ids: existingUsers?.map(u => u.id),
+        recommendation: 'The database schema has conflicting constraints. Consider testing signup directly in your frontend instead of this debug endpoint.',
+        alternative: 'Use your working local signup logic, or modify the database constraints',
+        company_isolation_status: 'Can still test isolation with existing users - your account vs. others'
+      })
 
       console.log('Create result:', { success: !!newUser, error: createError?.message })
 

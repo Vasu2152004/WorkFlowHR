@@ -59,20 +59,30 @@ export default async function handler(req, res) {
     // Test company: 51c9890f-7efe-45b0-9faf-595208b87143 (new signups)
     const testCompanyId = '51c9890f-7efe-45b0-9faf-595208b87143'
 
-    // Use your existing user ID as the creator (for foreign key constraint)
+    // Use your existing user ID as the creator
     const creatorUserId = '84c5a3ad-4d6d-417e-a730-85ea8c85d98a' // Your user ID
+    
+    // Generate a proper UUID using crypto
+    const { randomUUID } = require('crypto')
+    const newUserId = randomUUID()
+    
+    console.log('Creating user with ID:', newUserId)
+    console.log('Creator ID:', creatorUserId)
+    console.log('Test company ID:', testCompanyId)
 
-    // Create new user WITHOUT explicit ID (let database handle it)
+    // Create new user with all required fields
     const { data: newUser, error } = await supabase
       .from('users')
       .insert([
         {
+          id: newUserId,
           email: email.toLowerCase(),
           password: password, // In production, hash this!
           full_name: full_name,
           role: role,
           company_id: testCompanyId, // Assign to test company for isolation
           created_by: creatorUserId, // Foreign key to satisfy constraint
+          team_lead_id: null, // Explicitly set to null if not required
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
