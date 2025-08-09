@@ -5,7 +5,7 @@ import { User, Mail, Shield, ArrowLeft, Plus, CheckCircle, AlertCircle } from 'l
 import toast from 'react-hot-toast'
 
 export default function AddHRStaff() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, API_BASE_URL } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     full_name: '',
@@ -90,8 +90,8 @@ export default function AddHRStaff() {
 
       // Determine the API endpoint based on role
       const endpoint = formData.role === 'hr_manager' 
-        ? 'http://localhost:3000/api/auth/add-hr-manager'
-        : 'http://localhost:3000/api/auth/add-hr-staff'
+        ? `${API_BASE_URL}/auth/add-hr-manager`
+        : `${API_BASE_URL}/auth/add-hr-staff`
 
       // Send to backend API
       const response = await fetch(endpoint, {

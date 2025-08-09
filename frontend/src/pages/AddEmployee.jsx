@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import axios from 'axios' // Added axios import
 
 export default function AddEmployee() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, API_BASE_URL } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     full_name: '',
@@ -192,7 +192,7 @@ export default function AddEmployee() {
       }
 
       // Send to backend API
-      const response = await fetch('http://localhost:3000/api/users/employees', {
+      const response = await fetch(`${API_BASE_URL}/users/employees`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
