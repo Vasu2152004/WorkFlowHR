@@ -21,10 +21,18 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
+    console.log('Login attempt:', { email: req.body.email, hasPassword: !!req.body.password })
+    console.log('Environment check:', { 
+      hasUrl: !!supabaseUrl, 
+      hasKey: !!supabaseKey,
+      urlStart: supabaseUrl?.substring(0, 20) + '...'
+    })
+
     if (!supabaseUrl || !supabaseKey) {
       return res.status(500).json({ 
         error: 'Database configuration missing',
-        message: 'Please set up environment variables'
+        message: 'Please set up environment variables',
+        debug: { hasUrl: !!supabaseUrl, hasKey: !!supabaseKey }
       })
     }
 
@@ -36,6 +44,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Email and password are required' })
     }
 
+    console.log('Querying user:', email.toLowerCase())
+
     // Query user from database
     const { data: user, error } = await supabase
       .from('users')
@@ -43,14 +53,40 @@ export default async function handler(req, res) {
       .eq('email', email.toLowerCase())
       .single()
 
-    if (error || !user) {
-      return res.status(401).json({ error: 'Invalid credentials' })
+    console.log('Database query result:', { 
+      hasUser: !!user, 
+      error: error?.message,
+      userEmail: user?.email 
+    })
+
+    if (error) {
+      console.error('Supabase error:', error)
+      return res.status(401).json({ 
+        error: 'Invalid credentials', 
+        debug: { dbError: error.message } 
+      })
     }
+
+    if (!user) {
+      return res.status(401).json({ 
+        error: 'Invalid credentials',
+        debug: { reason: 'User not found' }
+      })
+    }
+
+    console.log('Password check:', { 
+      provided: password?.substring(0, 3) + '...', 
+      stored: user.password?.substring(0, 3) + '...',
+      match: user.password === password
+    })
 
     // For demo purposes, we'll do a simple password check
     // In production, you should use proper password hashing
     if (user.password !== password) {
-      return res.status(401).json({ error: 'Invalid credentials' })
+      return res.status(401).json({ 
+        error: 'Invalid credentials',
+        debug: { reason: 'Password mismatch' }
+      })
     }
 
     // Remove password from response
