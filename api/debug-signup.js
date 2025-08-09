@@ -89,19 +89,14 @@ export default async function handler(req, res) {
       // Test company assignment
       const testCompanyId = '51c9890f-7efe-45b0-9faf-595208b87143'
 
-      // Generate UUID for new user
-      const { randomUUID } = require('crypto')
-      const newUserId = randomUUID()
-      
       // Use your existing user ID as the creator (for foreign key constraint)
       const creatorUserId = '84c5a3ad-4d6d-417e-a730-85ea8c85d98a' // Your user ID
 
-      // Try to create user
+      // Try to create user WITHOUT explicit ID (let database handle it)
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert([
           {
-            id: newUserId, // Explicitly provide ID
             email: email.toLowerCase(),
             password: password,
             full_name: full_name,
