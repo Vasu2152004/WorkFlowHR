@@ -23,6 +23,10 @@
       "destination": "/api/debug-isolation"
     },
     {
+      "source": "/api/debug-signup",
+      "destination": "/api/debug-signup"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
