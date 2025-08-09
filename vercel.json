@@ -39,6 +39,10 @@
       "destination": "/api/check-company"
     },
     {
+      "source": "/api/users/employees",
+      "destination": "/api/employees"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
