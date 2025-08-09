@@ -23,6 +23,10 @@
       "destination": "/api/debug-login"
     },
     {
+      "source": "/api/test-password",
+      "destination": "/api/test-password"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
