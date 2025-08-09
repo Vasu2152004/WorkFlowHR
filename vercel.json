@@ -30,6 +30,14 @@
       "source": "/api/debug-signup",
       "destination": "/api/debug-signup"
     },
+    {
+      "source": "/api/auth/add-hr-staff",
+      "destination": "/api/add-hr-staff"
+    },
+    {
+      "source": "/api/auth/add-hr-manager",
+      "destination": "/api/add-hr-manager"
+    },
 
 
     {
