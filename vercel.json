@@ -30,10 +30,7 @@
       "source": "/api/debug-signup",
       "destination": "/api/debug-signup"
     },
-    {
-      "source": "/api/test-email",
-      "destination": "/api/test-email"
-    },
+
 
     {
       "source": "/(.*)",
