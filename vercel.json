@@ -27,6 +27,10 @@
       "destination": "/api/test-password"
     },
     {
+      "source": "/api/set-password",
+      "destination": "/api/set-password"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
