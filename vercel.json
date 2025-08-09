@@ -3,6 +3,18 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
+      "source": "/api/auth/login",
+      "destination": "/api/login"
+    },
+    {
+      "source": "/api/auth/register",
+      "destination": "/api/register"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/health"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
