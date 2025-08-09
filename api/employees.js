@@ -33,11 +33,34 @@ export default async function handler(req, res) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    console.log('Fetching employees for token:', token.substring(0, 10) + '...')
+    console.log('Fetching employees for token:', token.substring(0, 20) + '...')
 
-    // For now, get the main company employees
-    // TODO: Implement proper JWT token verification to get user's company_id
-    const mainCompanyId = '48a5892f-a5a3-413c-98a6-1ff492556022'
+    // Extract user ID from token (format: 'demo-token-{user_id}')
+    if (!token.startsWith('demo-token-')) {
+      return res.status(401).json({ error: 'Invalid token format' })
+    }
+
+    const userId = token.replace('demo-token-', '')
+    console.log('Extracted user ID:', userId)
+
+    // Get the logged-in user's company_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('id, email, full_name, role, company_id')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !currentUser) {
+      console.error('User lookup error:', userError)
+      return res.status(401).json({ error: 'Invalid token - user not found' })
+    }
+
+    if (!currentUser.company_id) {
+      return res.status(400).json({ error: 'User has no company assigned' })
+    }
+
+    console.log('Current user company:', currentUser.company_id)
+    const userCompanyId = currentUser.company_id
 
     // Fetch employees from the main company (using only existing columns)
     const { data: employees, error } = await supabase
@@ -50,7 +73,7 @@ export default async function handler(req, res) {
         company_id,
         created_at
       `)
-      .eq('company_id', mainCompanyId)
+      .eq('company_id', userCompanyId)
       .neq('role', 'admin') // Exclude admin from employee list
       .order('full_name', { ascending: true })
 
@@ -59,7 +82,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: error.message })
     }
 
-    console.log(`Found ${employees.length} employees for company ${mainCompanyId}`)
+    console.log(`Found ${employees.length} employees for company ${userCompanyId} (user: ${currentUser.email})`)
 
     // Transform data to match frontend expectations (using available columns only)
     const transformedEmployees = employees.map(emp => ({
@@ -83,7 +106,12 @@ export default async function handler(req, res) {
       success: true,
       employees: transformedEmployees,
       total: transformedEmployees.length,
-      company_id: mainCompanyId,
+      company_id: userCompanyId,
+      current_user: {
+        id: currentUser.id,
+        email: currentUser.email,
+        role: currentUser.role
+      },
       message: 'Employees fetched successfully'
     })
 
