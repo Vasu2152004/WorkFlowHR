@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     // TODO: Implement proper JWT token verification to get user's company_id
     const mainCompanyId = '48a5892f-a5a3-413c-98a6-1ff492556022'
 
-    // Fetch employees from the main company
+    // Fetch employees from the main company (using only existing columns)
     const { data: employees, error } = await supabase
       .from('users')
       .select(`
@@ -48,14 +48,7 @@ export default async function handler(req, res) {
         full_name,
         role,
         company_id,
-        department,
-        designation,
-        salary,
-        joining_date,
-        phone_number,
-        address,
-        created_at,
-        updated_at
+        created_at
       `)
       .eq('company_id', mainCompanyId)
       .neq('role', 'admin') // Exclude admin from employee list
@@ -68,17 +61,17 @@ export default async function handler(req, res) {
 
     console.log(`Found ${employees.length} employees for company ${mainCompanyId}`)
 
-    // Transform data to match frontend expectations
+    // Transform data to match frontend expectations (using available columns only)
     const transformedEmployees = employees.map(emp => ({
       id: emp.id,
       full_name: emp.full_name,
       email: emp.email,
-      department: emp.department || 'Not Assigned',
-      designation: emp.designation || 'Not Assigned',
-      salary: emp.salary || 0,
-      joining_date: emp.joining_date || emp.created_at,
-      phone_number: emp.phone_number || '',
-      address: emp.address || '',
+      department: 'Not Assigned', // Column doesn't exist yet
+      designation: 'Not Assigned', // Column doesn't exist yet
+      salary: 50000, // Default salary
+      joining_date: emp.created_at,
+      phone_number: '', // Column doesn't exist yet
+      address: '', // Column doesn't exist yet
       role: emp.role,
       company_id: emp.company_id,
       leave_balance: 20, // Default leave balance

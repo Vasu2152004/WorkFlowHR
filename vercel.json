@@ -43,6 +43,10 @@
       "destination": "/api/employees"
     },
     {
+      "source": "/api/check-schema",
+      "destination": "/api/check-schema"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
