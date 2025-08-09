@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { email, password, full_name, role = 'employee' } = req.body
+    const { email, password, full_name, role = 'admin' } = req.body
 
     if (!email || !password || !full_name) {
       return res.status(400).json({ error: 'Email, password, and full_name are required' })
@@ -54,6 +54,11 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: 'User already exists' })
     }
 
+    // Assign to a DIFFERENT company for testing isolation
+    // Main company: 48a5892f-a5a3-413c-98a6-1ff492556022 (existing users)
+    // Test company: 51c9890f-7efe-45b0-9faf-595208b87143 (new signups)
+    const testCompanyId = '51c9890f-7efe-45b0-9faf-595208b87143'
+
     // Create new user
     const { data: newUser, error } = await supabase
       .from('users')
@@ -63,6 +68,7 @@ export default async function handler(req, res) {
           password: password, // In production, hash this!
           full_name: full_name,
           role: role,
+          company_id: testCompanyId, // Assign to test company for isolation
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -82,8 +88,13 @@ export default async function handler(req, res) {
     const { password: _, ...userWithoutPassword } = newUser
 
     res.status(201).json({
-      message: 'User created successfully',
-      user: userWithoutPassword
+      message: 'User created successfully - assigned to test company for isolation testing',
+      user: userWithoutPassword,
+      company_isolation_info: {
+        assigned_company: testCompanyId,
+        role: role,
+        note: 'This user will see different employees than main company users'
+      }
     })
 
   } catch (error) {
