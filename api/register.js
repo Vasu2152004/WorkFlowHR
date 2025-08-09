@@ -59,11 +59,16 @@ export default async function handler(req, res) {
     // Test company: 51c9890f-7efe-45b0-9faf-595208b87143 (new signups)
     const testCompanyId = '51c9890f-7efe-45b0-9faf-595208b87143'
 
+    // Generate UUID for new user
+    const { randomUUID } = require('crypto')
+    const newUserId = randomUUID()
+
     // Create new user
     const { data: newUser, error } = await supabase
       .from('users')
       .insert([
         {
+          id: newUserId, // Explicitly provide ID
           email: email.toLowerCase(),
           password: password, // In production, hash this!
           full_name: full_name,
