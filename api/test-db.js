@@ -53,20 +53,28 @@ export default async function handler(req, res) {
       })
     }
 
-    // Try to list first few users (without passwords)
+    // Try to list first few users (without passwords) - discover columns
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, email, name, role, created_at')
+      .select('*')
       .limit(5)
+
+    // Remove passwords from response for security
+    const safeUsers = users?.map(user => {
+      const { password, ...safeUser } = user
+      return safeUser
+    }) || []
 
     res.status(200).json({
       message: 'Database connection successful',
       connectionTest: 'PASSED',
       userCount: data?.length || 0,
-      sampleUsers: users || [],
+      sampleUsers: safeUsers,
+      actualColumns: users?.length > 0 ? Object.keys(users[0]) : [],
       debug: {
         hasUsers: !!users?.length,
-        usersError: usersError?.message
+        usersError: usersError?.message,
+        rawUserCount: users?.length || 0
       }
     })
 
