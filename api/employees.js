@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return
   }
 
-  if (req.method !== 'GET' && req.method !== 'POST') {
+  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
@@ -66,6 +66,11 @@ export default async function handler(req, res) {
     // Handle POST request (Add Employee)
     if (req.method === 'POST') {
       return await handleAddEmployee(req, res, supabase, currentUser)
+    }
+
+    // Handle DELETE request (Delete Employee)
+    if (req.method === 'DELETE') {
+      return await handleDeleteEmployee(req, res, supabase, currentUser)
     }
 
     // Fetch employees from the main company (using only existing columns)
@@ -267,6 +272,88 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
     return res.status(500).json({ 
       error: 'Internal server error',
       message: error.message 
+    })
+  }
+}
+
+// Handle DELETE employee request
+async function handleDeleteEmployee(req, res, supabase, currentUser) {
+  try {
+    // Check permissions - only admin, hr_manager, and hr can delete employees
+    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return res.status(403).json({ 
+        error: 'Permission denied. Only Admin, HR Manager, and HR can delete employees.' 
+      })
+    }
+
+    // Get employee ID from query parameters
+    const { employee_id } = req.query
+    if (!employee_id) {
+      return res.status(400).json({ 
+        error: 'Employee ID is required for deletion' 
+      })
+    }
+
+    console.log('Attempting to delete employee:', employee_id)
+
+    // First, check if the employee exists and belongs to the same company
+    const { data: employeeToDelete, error: fetchError } = await supabase
+      .from('users')
+      .select('id, full_name, email, role, company_id')
+      .eq('id', employee_id)
+      .single()
+
+    if (fetchError || !employeeToDelete) {
+      return res.status(404).json({ 
+        error: 'Employee not found' 
+      })
+    }
+
+    // Check if the employee belongs to the same company (company isolation)
+    if (employeeToDelete.company_id !== currentUser.company_id) {
+      return res.status(403).json({ 
+        error: 'Permission denied. You can only delete employees from your company.' 
+      })
+    }
+
+    // Prevent deleting yourself
+    if (employeeToDelete.id === currentUser.id) {
+      return res.status(400).json({ 
+        error: 'You cannot delete your own account' 
+      })
+    }
+
+    // Delete the employee
+    const { error: deleteError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', employee_id)
+
+    if (deleteError) {
+      console.error('Delete employee error:', deleteError)
+      return res.status(500).json({ 
+        error: 'Failed to delete employee', 
+        details: deleteError.message 
+      })
+    }
+
+    console.log('✅ Employee deleted successfully:', employeeToDelete.full_name)
+
+    return res.status(200).json({
+      message: 'Employee deleted successfully',
+      deleted_employee: {
+        id: employeeToDelete.id,
+        name: employeeToDelete.full_name,
+        email: employeeToDelete.email,
+        role: employeeToDelete.role
+      }
+    })
+
+  } catch (error) {
+    console.error('Delete employee error:', error)
+    return res.status(500).json({ 
+      error: 'Failed to delete employee', 
+      details: error.message 
     })
   }
 }

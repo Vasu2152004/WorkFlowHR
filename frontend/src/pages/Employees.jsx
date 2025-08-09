@@ -173,7 +173,7 @@ const Employees = () => {
   const handleDeleteEmployee = async (employeeId) => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/users/employees/${employeeId}`, {
+      const response = await fetch(`${API_BASE_URL}/users/employees?employee_id=${employeeId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
