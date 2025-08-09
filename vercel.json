@@ -1,16 +1,7 @@
 {
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/*.js": {
-      "runtime": "@vercel/node@3.0.7"
-    }
-  },
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/server"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
