@@ -1,5 +1,5 @@
 const { createClient } = require('@supabase/supabase-js')
-const { sendWelcomeEmail } = require('../utils/emailService')
+const nodemailer = require('nodemailer')
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -238,20 +238,94 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
     // Remove password from response for security
     const { password: _, ...employeeWithoutPassword } = newEmployee
 
-    // Send welcome email with credentials
+    // Send welcome email with credentials (inline implementation)
     let emailSent = false
     try {
-      emailSent = await sendWelcomeEmail(
-        {
-          full_name,
-          email,
-          department,
-          designation
-        },
-        generatedPassword,
-        employeeId,
-        'Your Company'
-      )
+      const emailUser = process.env.EMAIL_USER
+      const emailPass = process.env.EMAIL_PASS
+      
+      if (emailUser && emailPass) {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: emailUser,
+            pass: emailPass
+          }
+        })
+
+        const welcomeEmailHTML = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="color: #16a34a; margin-top: 0;">🎉 Welcome to Your Company!</h2>
+              <p>Congratulations ${full_name}! Your employee account has been successfully created.</p>
+            </div>
+            
+            <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb;">
+              <h3 style="color: #1f2937; margin-top: 0;">Your Account Details:</h3>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Full Name:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${full_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Employee ID:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${employeeId}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Email:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${email}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Department:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${department}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Designation:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${designation}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #f59e0b;">
+              <h3 style="color: #92400e; margin-top: 0;">🔐 Your Login Credentials:</h3>
+              <p style="margin: 0; color: #92400e;"><strong>Email:</strong> ${email}</p>
+              <p style="margin: 10px 0 0 0; color: #92400e;"><strong>Temporary Password:</strong> <code style="background: #ffffff; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${generatedPassword}</code></p>
+              <p style="margin: 10px 0 0 0; color: #92400e; font-size: 14px;"><em>⚠️ Please change this password upon your first login for security.</em></p>
+            </div>
+            
+            <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-top: 20px;">
+              <h3 style="color: #1e40af; margin-top: 0;">🚀 Next Steps:</h3>
+              <ol style="color: #1e40af; margin: 0; padding-left: 20px;">
+                <li>Login to the WorkFlowHR system using your credentials</li>
+                <li>Complete your profile information</li>
+                <li>Review company policies and procedures</li>
+                <li>Contact HR if you need any assistance</li>
+              </ol>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+              <p style="margin: 0; color: #1f2937; font-weight: bold;">Welcome to the team! 🌟</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; color: #6b7280; font-size: 14px;">
+              <p>This is an automated notification from the WorkFlowHR system.</p>
+            </div>
+          </div>
+        `
+
+        const mailOptions = {
+          from: emailUser,
+          to: email,
+          subject: `🎉 Welcome to Your Company - Your Account Details`,
+          html: welcomeEmailHTML
+        }
+
+        const info = await transporter.sendMail(mailOptions)
+        console.log('✅ Welcome email sent:', info.messageId)
+        emailSent = true
+      } else {
+        console.log('⚠️ Email credentials not configured')
+      }
     } catch (emailError) {
       console.error('❌ Failed to send welcome email:', emailError)
     }
