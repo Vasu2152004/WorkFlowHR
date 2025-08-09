@@ -1,5 +1,5 @@
 const { createClient } = require('@supabase/supabase-js')
-const { sendWelcomeEmail } = require('../utils/emailService')
+// const { sendWelcomeEmail } = require('../utils/emailService') // TODO: Fix email import
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -147,8 +147,6 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
     const {
       full_name,
       email,
-      department,
-      designation,
       salary,
       joining_date,
       phone_number,
@@ -159,9 +157,13 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
       leave_balance
     } = req.body
 
-    if (!full_name || !email || !department || !designation || !salary) {
-      return res.status(400).json({ error: 'Required fields missing: full_name, email, department, designation, salary' })
+    if (!full_name || !email || !salary) {
+      return res.status(400).json({ error: 'Required fields missing: full_name, email, salary' })
     }
+
+    // Set defaults for missing database columns
+    const department = req.body.department || 'Not Assigned'
+    const designation = req.body.designation || 'Employee'
 
     // Check if email already exists
     const { data: existingUser } = await supabase
@@ -236,8 +238,10 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
     // Remove password from response for security
     const { password: _, ...employeeWithoutPassword } = newEmployee
 
-    // Send welcome email with credentials
+    // Send welcome email with credentials (disabled for now due to import issue)
     let emailSent = false
+    // TODO: Re-enable email functionality once import issue is resolved
+    /*
     try {
       emailSent = await sendWelcomeEmail(
         {
@@ -248,11 +252,12 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
         },
         generatedPassword,
         employeeId,
-        'Your Company' // TODO: Get company name from database
+        'Your Company'
       )
     } catch (emailError) {
       console.error('❌ Failed to send welcome email:', emailError)
     }
+    */
 
     return res.status(201).json({
       message: 'Employee created successfully',
