@@ -21,29 +21,68 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
+      const { createClient } = require('@supabase/supabase-js')
       const { email, password } = req.body
 
-      // Simple test - let's manually check admin@test.com
-      if (email === 'admin@test.com') {
+      // Now let's check against the actual database
+      const supabaseUrl = process.env.SUPABASE_URL
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+      if (!supabaseUrl || !supabaseKey) {
         return res.status(200).json({
-          success: true,
-          email: email,
-          password_provided: password,
-          test_results: {
+          error: 'Database not configured',
+          manual_test_results: {
             'admin': password === 'admin',
             'password': password === 'password', 
             'test': password === 'test',
             '123456': password === '123456',
             'admin123': password === 'admin123'
-          },
-          message: 'Manual password test completed'
+          }
         })
       }
 
+      const supabase = createClient(supabaseUrl, supabaseKey)
+
+      // Get the actual user from database
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('id, email, password, full_name, role')
+        .eq('email', email.toLowerCase())
+        .single()
+
+      if (error || !user) {
+        return res.status(200).json({
+          success: false,
+          email: email,
+          error: 'User not found in database',
+          db_error: error?.message
+        })
+      }
+
+      // Test the actual stored password
+      const storedPassword = user.password
+      const isExactMatch = storedPassword === password
+
       return res.status(200).json({
-        success: false,
+        success: true,
         email: email,
-        message: 'Only testing admin@test.com for now'
+        user_found: true,
+        password_analysis: {
+          provided: password,
+          provided_length: password.length,
+          stored_length: storedPassword.length,
+          stored_starts: storedPassword.substring(0, 10),
+          exact_match: isExactMatch,
+          is_hashed: storedPassword.length > 20,
+          test_results: {
+            'admin': storedPassword === 'admin',
+            'password': storedPassword === 'password', 
+            'test': storedPassword === 'test',
+            '123456': storedPassword === '123456',
+            'admin123': storedPassword === 'admin123'
+          }
+        },
+        message: isExactMatch ? 'PASSWORD MATCHES!' : 'Password does not match'
       })
 
     } catch (error) {
