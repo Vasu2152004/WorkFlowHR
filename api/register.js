@@ -62,6 +62,9 @@ export default async function handler(req, res) {
     // Generate UUID for new user
     const { randomUUID } = require('crypto')
     const newUserId = randomUUID()
+    
+    // Use your existing user ID as the creator (for foreign key constraint)
+    const creatorUserId = '84c5a3ad-4d6d-417e-a730-85ea8c85d98a' // Your user ID
 
     // Create new user
     const { data: newUser, error } = await supabase
@@ -74,6 +77,7 @@ export default async function handler(req, res) {
           full_name: full_name,
           role: role,
           company_id: testCompanyId, // Assign to test company for isolation
+          created_by: creatorUserId, // Foreign key to satisfy constraint
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
