@@ -25,13 +25,7 @@
   ],
   "functions": {
     "server.js": {
-      "includeFiles": [
-        "routes/**",
-        "controllers/**",
-        "middleware/**",
-        "utils/**",
-        "config/**"
-      ]
+      "includeFiles": "{routes,controllers,middleware,utils,config}/**"
     }
   }
 }
