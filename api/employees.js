@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js')
+const { sendWelcomeEmail } = require('../utils/emailService')
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -230,17 +231,35 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
     // Remove password from response for security
     const { password: _, ...employeeWithoutPassword } = newEmployee
 
-    // TODO: Send welcome email with credentials
-    // This would require email service integration
+    // Send welcome email with credentials
+    let emailSent = false
+    try {
+      emailSent = await sendWelcomeEmail(
+        {
+          full_name,
+          email,
+          department,
+          designation
+        },
+        generatedPassword,
+        employeeId,
+        'Your Company' // TODO: Get company name from database
+      )
+    } catch (emailError) {
+      console.error('❌ Failed to send welcome email:', emailError)
+    }
 
     return res.status(201).json({
       message: 'Employee created successfully',
       employee: {
         ...employeeWithoutPassword,
         employee_id: employeeId,
-        password: generatedPassword // Include in response for now (would be emailed in production)
+        password: generatedPassword // Include in response for now
       },
-      email_status: 'Email functionality not implemented yet - please share credentials manually'
+      email_sent: emailSent,
+      email_status: emailSent 
+        ? 'Welcome email sent successfully' 
+        : 'Email not configured - please share credentials manually'
     })
 
   } catch (error) {

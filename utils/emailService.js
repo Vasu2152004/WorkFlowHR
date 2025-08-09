@@ -178,6 +178,66 @@ const emailTemplates = {
         <p>This is an automated notification from the WorkFlowHR system.</p>
       </div>
     </div>
+  `,
+
+  newEmployeeWelcome: (employeeName, email, password, employeeId, department, designation, companyName = 'Your Company') => `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h2 style="color: #16a34a; margin-top: 0;">🎉 Welcome to ${companyName}!</h2>
+        <p>Congratulations ${employeeName}! Your employee account has been successfully created.</p>
+      </div>
+      
+      <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb;">
+        <h3 style="color: #1f2937; margin-top: 0;">Your Account Details:</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Full Name:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${employeeName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Employee ID:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${employeeId}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Email:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Department:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${department}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Designation:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${designation}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #f59e0b;">
+        <h3 style="color: #92400e; margin-top: 0;">🔐 Your Login Credentials:</h3>
+        <p style="margin: 0; color: #92400e;"><strong>Email:</strong> ${email}</p>
+        <p style="margin: 10px 0 0 0; color: #92400e;"><strong>Temporary Password:</strong> <code style="background: #ffffff; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${password}</code></p>
+        <p style="margin: 10px 0 0 0; color: #92400e; font-size: 14px;"><em>⚠️ Please change this password upon your first login for security.</em></p>
+      </div>
+      
+      <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-top: 20px;">
+        <h3 style="color: #1e40af; margin-top: 0;">🚀 Next Steps:</h3>
+        <ol style="color: #1e40af; margin: 0; padding-left: 20px;">
+          <li>Login to the WorkFlowHR system using your credentials</li>
+          <li>Complete your profile information</li>
+          <li>Review company policies and procedures</li>
+          <li>Contact HR if you need any assistance</li>
+        </ol>
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px;">
+        <p style="margin: 0; color: #1f2937; font-weight: bold;">Welcome to the team! 🌟</p>
+      </div>
+      
+      <div style="text-align: center; margin-top: 20px; color: #6b7280; font-size: 14px;">
+        <p>This is an automated notification from the WorkFlowHR system.</p>
+      </div>
+    </div>
   `
 }
 
@@ -324,6 +384,40 @@ const emailService = {
       return true
     } catch (error) {
       console.error('❌ Failed to send salary slip notification:', error)
+      return false
+    }
+  },
+
+  // Send welcome email to new employee
+  async sendWelcomeEmail(employeeData, password, employeeId, companyName = 'Your Company') {
+    if (!transporter) {
+      console.log('⚠️ Email service not configured - skipping welcome email')
+      return false
+    }
+
+    try {
+      const html = emailTemplates.newEmployeeWelcome(
+        employeeData.full_name,
+        employeeData.email,
+        password,
+        employeeId,
+        employeeData.department,
+        employeeData.designation,
+        companyName
+      )
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER || 'your-email@gmail.com',
+        to: employeeData.email,
+        subject: `🎉 Welcome to ${companyName} - Your Account Details`,
+        html: html
+      }
+
+      const info = await transporter.sendMail(mailOptions)
+      console.log('✅ Welcome email sent:', info.messageId)
+      return true
+    } catch (error) {
+      console.error('❌ Failed to send welcome email:', error)
       return false
     }
   },
