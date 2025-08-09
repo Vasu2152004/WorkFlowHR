@@ -4,7 +4,7 @@ const path = require('path')
 
 module.exports = defineConfig({
   plugins: [react()],
-  base: '/',
+  base: './',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
