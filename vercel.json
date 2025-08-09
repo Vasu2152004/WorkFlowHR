@@ -15,36 +15,8 @@
       "destination": "/api/health"
     },
     {
-      "source": "/api/test-db",
-      "destination": "/api/test-db"
-    },
-    {
-      "source": "/api/debug-login",
-      "destination": "/api/debug-login"
-    },
-    {
-      "source": "/api/test-password",
-      "destination": "/api/test-password"
-    },
-    {
-      "source": "/api/set-password",
-      "destination": "/api/set-password"
-    },
-    {
-      "source": "/api/check-data",
-      "destination": "/api/check-data"
-    },
-    {
-      "source": "/api/check-company",
-      "destination": "/api/check-company"
-    },
-    {
       "source": "/api/users/employees",
       "destination": "/api/employees"
-    },
-    {
-      "source": "/api/check-schema",
-      "destination": "/api/check-schema"
     },
     {
       "source": "/api/debug-isolation",
