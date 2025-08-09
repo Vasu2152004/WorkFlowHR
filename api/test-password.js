@@ -61,6 +61,25 @@ export default async function handler(req, res) {
 
       // Test the actual stored password
       const storedPassword = user.password
+      
+      // Handle null/undefined password
+      if (storedPassword === null || storedPassword === undefined) {
+        return res.status(200).json({
+          success: false,
+          email: email,
+          user_found: true,
+          error: 'PASSWORD_IS_NULL',
+          user_info: {
+            id: user.id,
+            email: user.email,
+            full_name: user.full_name,
+            role: user.role,
+            password_field: storedPassword
+          },
+          message: 'Password field in database is null/undefined'
+        })
+      }
+
       const isExactMatch = storedPassword === password
 
       return res.status(200).json({
@@ -69,11 +88,12 @@ export default async function handler(req, res) {
         user_found: true,
         password_analysis: {
           provided: password,
-          provided_length: password.length,
-          stored_length: storedPassword.length,
-          stored_starts: storedPassword.substring(0, 10),
+          provided_length: password?.length || 0,
+          stored_length: storedPassword?.length || 0,
+          stored_starts: storedPassword?.substring(0, 10) || 'N/A',
+          stored_password: storedPassword, // Show full password for debugging
           exact_match: isExactMatch,
-          is_hashed: storedPassword.length > 20,
+          is_hashed: (storedPassword?.length || 0) > 20,
           test_results: {
             'admin': storedPassword === 'admin',
             'password': storedPassword === 'password', 
