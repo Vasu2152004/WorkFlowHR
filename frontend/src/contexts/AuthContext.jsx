@@ -2,7 +2,17 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
 import { toast } from 'react-hot-toast'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+// Auto-detect API URL based on environment
+const getApiBaseUrl = () => {
+  // If we're in production (deployed), use the same domain
+  if (window.location.hostname !== 'localhost') {
+    return `${window.location.origin}/api`
+  }
+  // Otherwise use localhost for development
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 const AuthContext = createContext()
 
