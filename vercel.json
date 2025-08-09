@@ -22,14 +22,7 @@
       "source": "/api/users/employees",
       "destination": "/api/employees"
     },
-    {
-      "source": "/api/debug-isolation",
-      "destination": "/api/debug-isolation"
-    },
-    {
-      "source": "/api/debug-signup",
-      "destination": "/api/debug-signup"
-    },
+
     {
       "source": "/api/auth/add-hr-staff",
       "destination": "/api/add-hr-staff"
