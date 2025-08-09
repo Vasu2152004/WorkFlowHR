@@ -1,14 +1,14 @@
 const express = require('express')
 const cors = require('cors')
 const path = require('path')
-require('dotenv').config()
 
 const app = express()
-const PORT = process.env.PORT || 3000
-const NODE_ENV = process.env.NODE_ENV || 'development'
 
 // Basic middleware
-app.use(cors())
+app.use(cors({
+  origin: ['https://work-flow-gnvfa838h-vasus-projects-33d70e7c.vercel.app', 'http://localhost:3001'],
+  credentials: true
+}))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
@@ -42,15 +42,15 @@ app.get('/test', (req, res) => {
 // Try to import and use routes with error handling
 try {
   // Import routes with error handling
-  const authRoutes = require('./routes/auth')
-  const userRoutes = require('./routes/users')
-  const documentRoutes = require('./routes/documents')
-  const leaveRoutes = require('./routes/leaves')
-  const teamLeadRoutes = require('./routes/teamLead')
-  const hrManagerRoutes = require('./routes/hrManager')
-  const salaryRoutes = require('./routes/salary')
-  const workingDaysRoutes = require('./routes/workingDays')
-  const companyCalendarRoutes = require('./routes/companyCalendar')
+  const authRoutes = require('../routes/auth')
+  const userRoutes = require('../routes/users')
+  const documentRoutes = require('../routes/documents')
+  const leaveRoutes = require('../routes/leaves')
+  const teamLeadRoutes = require('../routes/teamLead')
+  const hrManagerRoutes = require('../routes/hrManager')
+  const salaryRoutes = require('../routes/salary')
+  const workingDaysRoutes = require('../routes/workingDays')
+  const companyCalendarRoutes = require('../routes/companyCalendar')
 
   // API routes
   app.use('/api/auth', authRoutes)
@@ -79,7 +79,7 @@ try {
 
 // Optional email routes
 try {
-  const emailRoutes = require('./routes/email')
+  const emailRoutes = require('../routes/email')
   app.use('/api/email', emailRoutes)
   console.log('✅ Email routes loaded successfully')
 } catch (error) {
