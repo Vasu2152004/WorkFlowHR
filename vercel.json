@@ -19,6 +19,10 @@
       "destination": "/api/test-db"
     },
     {
+      "source": "/api/debug-login",
+      "destination": "/api/debug-login"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

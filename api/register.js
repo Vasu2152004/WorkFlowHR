@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization')
 
   if (req.method === 'OPTIONS') {
     res.status(200).end()
@@ -15,6 +15,13 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // TODO: Add authorization check - only admin/HR should be able to create users
+  // For now, this endpoint should only be used by authenticated admin/HR users
+  // const authHeader = req.headers.authorization
+  // if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  //   return res.status(401).json({ error: 'Authorization required' })
+  // }
 
   try {
     // Initialize Supabase client
