@@ -35,17 +35,28 @@ export default async function handler(req, res) {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     if (req.method === 'GET') {
-      // Test database connection
+      // Test database connection and check schema
       const { data: testData, error: testError } = await supabase
         .from('users')
-        .select('id, email, company_id')
-        .limit(1)
+        .select('*')
+        .limit(3)
+
+      // Try to get schema information by checking what columns exist
+      const sampleUser = testData?.[0]
+      const allColumns = sampleUser ? Object.keys(sampleUser) : []
 
       return res.status(200).json({
         message: 'Debug signup endpoint working',
         database_connection: !testError,
         database_error: testError?.message,
-        sample_data: testData?.[0],
+        sample_users: testData,
+        available_columns: allColumns,
+        foreign_key_analysis: {
+          has_manager_id: allColumns.includes('manager_id'),
+          has_parent_id: allColumns.includes('parent_id'),
+          has_created_by: allColumns.includes('created_by'),
+          has_supervisor_id: allColumns.includes('supervisor_id')
+        },
         instructions: 'Send POST with email, password, full_name to test signup'
       })
     }
