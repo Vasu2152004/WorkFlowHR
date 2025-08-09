@@ -47,6 +47,10 @@
       "destination": "/api/check-schema"
     },
     {
+      "source": "/api/debug-isolation",
+      "destination": "/api/debug-isolation"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
