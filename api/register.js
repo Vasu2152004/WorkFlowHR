@@ -30,10 +30,10 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { email, password, name, role = 'employee' } = req.body
+    const { email, password, full_name, role = 'employee' } = req.body
 
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: 'Email, password, and name are required' })
+    if (!email || !password || !full_name) {
+      return res.status(400).json({ error: 'Email, password, and full_name are required' })
     }
 
     // Check if user already exists
@@ -54,9 +54,11 @@ export default async function handler(req, res) {
         {
           email: email.toLowerCase(),
           password: password, // In production, hash this!
-          name: name,
+          full_name: full_name,
           role: role,
-          created_at: new Date().toISOString()
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }
       ])
       .select()

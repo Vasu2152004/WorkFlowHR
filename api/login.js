@@ -89,13 +89,17 @@ export default async function handler(req, res) {
       })
     }
 
+    console.log('Login successful for user:', user.email)
+
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user
 
     res.status(200).json({
       message: 'Login successful',
       user: userWithoutPassword,
-      token: 'demo-token-' + user.id // In production, use proper JWT
+      access_token: 'demo-token-' + user.id, // In production, use proper JWT
+      refresh_token: 'refresh-token-' + user.id,
+      token: 'demo-token-' + user.id // Legacy support
     })
 
   } catch (error) {
