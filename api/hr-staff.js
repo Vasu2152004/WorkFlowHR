@@ -54,16 +54,29 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid token - user not found' })
     }
 
-    // Check permissions - only admin and hr_manager can create HR staff
-    if (!['admin', 'hr_manager'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only Admin and HR Manager can create HR staff' })
-    }
-
     // Get HR staff data from request
-    const { full_name, email, password } = req.body
+    const { full_name, email, password, role = 'hr' } = req.body
 
     if (!full_name || !email || !password) {
       return res.status(400).json({ error: 'Required fields missing: full_name, email, password' })
+    }
+
+    // Validate role
+    if (!['hr', 'hr_manager'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be hr or hr_manager' })
+    }
+
+    // Check permissions based on role being created
+    if (role === 'hr_manager') {
+      // Only admin can create HR managers
+      if (!['admin'].includes(currentUser.role)) {
+        return res.status(403).json({ error: 'Only Admin can create HR managers' })
+      }
+    } else {
+      // Both admin and hr_manager can create HR staff
+      if (!['admin', 'hr_manager'].includes(currentUser.role)) {
+        return res.status(403).json({ error: 'Only Admin and HR Manager can create HR staff' })
+      }
     }
 
     // Check if email already exists
@@ -77,20 +90,20 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: 'User with this email already exists' })
     }
 
-    // Generate UUID for new HR staff
+    // Generate UUID for new HR user
     const { randomUUID } = require('crypto')
-    const newHRStaffId = randomUUID()
+    const newHRUserId = randomUUID()
 
-    // Create new HR staff
-    const { data: newHRStaff, error: createError } = await supabase
+    // Create new HR user
+    const { data: newHRUser, error: createError } = await supabase
       .from('users')
       .insert([
         {
-          id: newHRStaffId,
+          id: newHRUserId,
           email: email.toLowerCase(),
           password: password,
           full_name: full_name,
-          role: 'hr',
+          role: role,
           company_id: currentUser.company_id, // Same company as creator
           created_by: currentUser.id,
           is_active: true,
@@ -102,14 +115,14 @@ export default async function handler(req, res) {
       .single()
 
     if (createError) {
-      console.error('HR staff creation error:', createError)
+      console.error('HR user creation error:', createError)
       return res.status(500).json({ 
-        error: 'Failed to create HR staff',
+        error: `Failed to create ${role === 'hr_manager' ? 'HR manager' : 'HR staff'}`,
         message: createError.message 
       })
     }
 
-    // Send welcome email to new HR staff
+    // Send welcome email to new HR user
     let emailSent = false
     try {
       const emailUser = process.env.EMAIL_USER
@@ -124,15 +137,35 @@ export default async function handler(req, res) {
           }
         })
 
+        const isManager = role === 'hr_manager'
+        const roleTitle = isManager ? 'HR Manager' : 'HR Staff'
+        const roleColor = isManager ? '#2563eb' : '#2563eb'
+        
+        const responsibilities = isManager ? [
+          'Oversee HR operations and strategy',
+          'Manage HR staff and their activities', 
+          'Review and approve leave requests',
+          'Handle complex HR policies and procedures',
+          'Lead recruitment and hiring processes',
+          'Manage employee relations and development',
+          'Create and add new HR staff members'
+        ] : [
+          'Manage employee records and information',
+          'Process leave requests and approvals',
+          'Handle HR documentation and policies', 
+          'Support employee onboarding and development',
+          'Assist with recruitment and hiring processes'
+        ]
+
         const welcomeEmailHTML = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-              <h2 style="color: #2563eb; margin-top: 0;">🎉 Welcome to the HR Team!</h2>
-              <p>Congratulations ${full_name}! Your HR staff account has been successfully created.</p>
+              <h2 style="color: ${roleColor}; margin-top: 0;">🎉 Welcome ${isManager ? 'as HR Manager' : 'to the HR Team'}!</h2>
+              <p>Congratulations ${full_name}! Your ${roleTitle} account has been successfully created.</p>
             </div>
             
             <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb;">
-              <h3 style="color: #1f2937; margin-top: 0;">Your HR Account Details:</h3>
+              <h3 style="color: #1f2937; margin-top: 0;">Your ${roleTitle} Account Details:</h3>
               <table style="width: 100%; border-collapse: collapse;">
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Full Name:</strong></td>
@@ -144,7 +177,7 @@ export default async function handler(req, res) {
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Role:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">HR Staff</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${roleTitle}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Department:</strong></td>
@@ -161,18 +194,14 @@ export default async function handler(req, res) {
             </div>
             
             <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin-top: 20px;">
-              <h3 style="color: #1e40af; margin-top: 0;">🚀 Your HR Responsibilities:</h3>
+              <h3 style="color: #1e40af; margin-top: 0;">🚀 Your ${roleTitle} Responsibilities:</h3>
               <ol style="color: #1e40af; margin: 0; padding-left: 20px;">
-                <li>Manage employee records and information</li>
-                <li>Process leave requests and approvals</li>
-                <li>Handle HR documentation and policies</li>
-                <li>Support employee onboarding and development</li>
-                <li>Assist with recruitment and hiring processes</li>
+                ${responsibilities.map(resp => `<li>${resp}</li>`).join('')}
               </ol>
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
-              <p style="margin: 0; color: #1f2937; font-weight: bold;">Welcome to the HR team! 🌟</p>
+              <p style="margin: 0; color: #1f2937; font-weight: bold;">Welcome to ${isManager ? 'HR leadership' : 'the HR team'}! 🌟</p>
             </div>
             
             <div style="text-align: center; margin-top: 20px; color: #6b7280; font-size: 14px;">
@@ -184,12 +213,12 @@ export default async function handler(req, res) {
         const mailOptions = {
           from: emailUser,
           to: email,
-          subject: `🎉 Welcome to the HR Team - Your Account Details`,
+          subject: `🎉 Welcome ${isManager ? 'as HR Manager' : 'to the HR Team'} - Your Account Details`,
           html: welcomeEmailHTML
         }
 
         const info = await transporter.sendMail(mailOptions)
-        console.log('✅ HR staff welcome email sent:', info.messageId)
+        console.log(`✅ ${roleTitle} welcome email sent:`, info.messageId)
         emailSent = true
       } else {
         console.log('⚠️ Email credentials not configured')
@@ -199,13 +228,13 @@ export default async function handler(req, res) {
     }
 
     // Remove password from response for security
-    const { password: _, ...hrStaffWithoutPassword } = newHRStaff
+    const { password: _, ...hrUserWithoutPassword } = newHRUser
 
     return res.status(201).json({
-      message: 'HR staff created successfully',
+      message: `${role === 'hr_manager' ? 'HR manager' : 'HR staff'} created successfully`,
       user: {
-        ...hrStaffWithoutPassword,
-        role: 'hr'
+        ...hrUserWithoutPassword,
+        role: role
       },
       email_sent: emailSent,
       email_status: emailSent 
@@ -214,7 +243,7 @@ export default async function handler(req, res) {
     })
 
   } catch (error) {
-    console.error('Add HR staff error:', error)
+    console.error('Add HR user error:', error)
     return res.status(500).json({ 
       error: 'Internal server error',
       message: error.message 

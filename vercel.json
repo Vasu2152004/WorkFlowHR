@@ -25,11 +25,11 @@
 
     {
       "source": "/api/auth/add-hr-staff",
-      "destination": "/api/add-hr-staff"
+      "destination": "/api/hr-staff"
     },
     {
       "source": "/api/auth/add-hr-manager",
-      "destination": "/api/add-hr-manager"
+      "destination": "/api/hr-staff"
     },
 
 
