@@ -1,6 +1,5 @@
 const { createClient } = require('@supabase/supabase-js')
-// Temporarily disable email import to fix serverless function error
-// const { sendWelcomeEmail } = require('../utils/emailService')
+const { sendWelcomeEmail } = require('../utils/emailService')
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -239,10 +238,8 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
     // Remove password from response for security
     const { password: _, ...employeeWithoutPassword } = newEmployee
 
-    // Send welcome email with credentials (temporarily disabled)
+    // Send welcome email with credentials
     let emailSent = false
-    // TODO: Re-enable email once serverless function issue is resolved
-    /*
     try {
       emailSent = await sendWelcomeEmail(
         {
@@ -258,7 +255,6 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
     } catch (emailError) {
       console.error('❌ Failed to send welcome email:', emailError)
     }
-    */
 
     return res.status(201).json({
       message: 'Employee created successfully',
