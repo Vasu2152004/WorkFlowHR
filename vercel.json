@@ -11,6 +11,10 @@
       "destination": "/api/register"
     },
     {
+      "source": "/api/auth/signup",
+      "destination": "/api/register"
+    },
+    {
       "source": "/api/health",
       "destination": "/api/health"
     },
@@ -26,6 +30,7 @@
       "source": "/api/debug-signup",
       "destination": "/api/debug-signup"
     },
+
     {
       "source": "/(.*)",
       "destination": "/index.html"

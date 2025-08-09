@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
@@ -61,6 +61,11 @@ export default async function handler(req, res) {
 
     console.log('Current user company:', currentUser.company_id)
     const userCompanyId = currentUser.company_id
+
+    // Handle POST request (Add Employee)
+    if (req.method === 'POST') {
+      return await handleAddEmployee(req, res, supabase, currentUser)
+    }
 
     // Fetch employees from the main company (using only existing columns)
     const { data: employees, error } = await supabase
@@ -120,6 +125,129 @@ export default async function handler(req, res) {
     res.status(500).json({ 
       error: 'Failed to fetch employees',
       message: error.message
+    })
+  }
+}
+
+// Handle Add Employee functionality
+async function handleAddEmployee(req, res, supabase, currentUser) {
+  try {
+    // Check if user has permission to add employees
+    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return res.status(403).json({ error: 'Only Admin, HR Manager, and HR can create employees' })
+    }
+
+    // Get employee data from request
+    const {
+      full_name,
+      email,
+      department,
+      designation,
+      salary,
+      joining_date,
+      phone_number,
+      address,
+      emergency_contact,
+      pan_number,
+      bank_account,
+      leave_balance
+    } = req.body
+
+    if (!full_name || !email || !department || !designation || !salary) {
+      return res.status(400).json({ error: 'Required fields missing: full_name, email, department, designation, salary' })
+    }
+
+    // Check if email already exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single()
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'User with this email already exists' })
+    }
+
+    // Generate employee ID and password
+    const generateEmployeeId = () => {
+      const timestamp = Date.now().toString().slice(-6)
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+      return `EMP${timestamp}${random}`
+    }
+
+    const generatePassword = () => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
+      let password = ''
+      for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      return password
+    }
+
+    const employeeId = generateEmployeeId()
+    const generatedPassword = generatePassword()
+
+    // Determine role based on designation (HR roles get hr/hr_manager)
+    let role = 'employee'
+    if (designation.toLowerCase().includes('hr manager') || designation.toLowerCase().includes('hr-manager')) {
+      role = 'hr_manager'
+    } else if (designation.toLowerCase().includes('hr') || designation.toLowerCase().includes('human resources')) {
+      role = 'hr'
+    }
+
+    // Generate UUID for new employee
+    const { randomUUID } = require('crypto')
+    const newEmployeeId = randomUUID()
+
+    // Create new employee
+    const { data: newEmployee, error: createError } = await supabase
+      .from('users')
+      .insert([
+        {
+          id: newEmployeeId,
+          email: email.toLowerCase(),
+          password: generatedPassword,
+          full_name: full_name,
+          role: role,
+          company_id: currentUser.company_id, // Same company as creator
+          created_by: currentUser.id,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ])
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Employee creation error:', createError)
+      return res.status(500).json({ 
+        error: 'Failed to create employee',
+        message: createError.message 
+      })
+    }
+
+    // Remove password from response for security
+    const { password: _, ...employeeWithoutPassword } = newEmployee
+
+    // TODO: Send welcome email with credentials
+    // This would require email service integration
+
+    return res.status(201).json({
+      message: 'Employee created successfully',
+      employee: {
+        ...employeeWithoutPassword,
+        employee_id: employeeId,
+        password: generatedPassword // Include in response for now (would be emailed in production)
+      },
+      email_status: 'Email functionality not implemented yet - please share credentials manually'
+    })
+
+  } catch (error) {
+    console.error('Add employee error:', error)
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
     })
   }
 }
