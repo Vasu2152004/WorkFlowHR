@@ -7,20 +7,9 @@
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": "{routes,controllers,middleware,utils,config}/**"
-      }
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/server.js"
-    },
     {
       "source": "/(.*)",
       "destination": "/frontend/dist/index.html"
