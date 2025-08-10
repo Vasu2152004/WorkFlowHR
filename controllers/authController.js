@@ -257,7 +257,7 @@ const login = async (req, res) => {
 
     res.json({
       user: userData,
-      access_token: authData.session.access_token,
+      access_token: `demo-token-${userData.id}`,
       refresh_token: authData.session.refresh_token
     });
 
