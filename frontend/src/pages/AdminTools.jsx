@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { API_BASE_URL } from '../contexts/AuthContext'
 import { toast } from 'react-hot-toast'
 
 const AdminTools = () => {
-  const { user } = useAuth()
+  const { user, API_BASE_URL } = useAuth()
   const [loading, setLoading] = useState(false)
   const [templateStats, setTemplateStats] = useState(null)
   const [cleanupResult, setCleanupResult] = useState(null)

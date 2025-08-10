@@ -14,6 +14,9 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl()
 
+// Export API_BASE_URL for use in other components
+export { API_BASE_URL }
+
 const AuthContext = createContext()
 
 export const useAuth = () => {
