@@ -21,6 +21,7 @@ import CreateTemplate from './pages/CreateTemplate'
 import GenerateDocument from './pages/GenerateDocument'
 import EditTemplate from './pages/EditTemplate'
 import CompanyCalendar from './pages/CompanyCalendar'
+import AdminTools from './pages/AdminTools'
 
 function App() {
   return (
@@ -168,6 +169,14 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <CompanyCalendar />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin-tools" element={
+            <ProtectedRoute>
+              <Layout>
+                <AdminTools />
               </Layout>
             </ProtectedRoute>
           } />

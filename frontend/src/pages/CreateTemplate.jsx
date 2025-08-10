@@ -193,7 +193,7 @@ const CreateTemplate = () => {
 
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/documents/templates`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/templates`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

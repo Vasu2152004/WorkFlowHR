@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { authenticateToken, requireHR, validateCompanyAccess } = require('../middleware/auth');
+const { authenticateToken, requireHR, validateCompanyAccess, requireAdmin } = require('../middleware/auth');
 const documentController = require('../controllers/documentController');
 
 const router = express.Router();
@@ -36,6 +36,9 @@ router.get('/templates/:id', requireHR, documentController.getDocumentTemplate);
 router.post('/templates', requireHR, validateCreateTemplate, documentController.createDocumentTemplate);
 router.put('/templates/:id', requireHR, validateUpdateTemplate, documentController.updateDocumentTemplate);
 router.delete('/templates/:id', requireHR, documentController.deleteDocumentTemplate);
+
+// Admin cleanup route (admin only)
+router.post('/templates/cleanup', requireAdmin, documentController.cleanupOrphanedTemplates);
 
 // Generate document from template (HR only)
 router.post('/generate', requireHR, validateGenerateDocument, documentController.generateDocument);

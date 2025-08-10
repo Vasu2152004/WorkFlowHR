@@ -21,7 +21,9 @@ const GenerateDocument = () => {
   const { user, API_BASE_URL } = useAuth()
   const navigate = useNavigate()
   const [templates, setTemplates] = useState([])
+  const [employees, setEmployees] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [fieldValues, setFieldValues] = useState({})
   const [previewContent, setPreviewContent] = useState('')
   const [isPreviewMode, setIsPreviewMode] = useState(false)
@@ -31,9 +33,10 @@ const GenerateDocument = () => {
   const [success, setSuccess] = useState('')
   const [deletingTemplate, setDeletingTemplate] = useState(null)
 
-  // Fetch available templates
+  // Fetch available templates and employees
   useEffect(() => {
     fetchTemplates()
+    fetchEmployees()
   }, [])
 
   const fetchTemplates = async () => {
@@ -48,7 +51,7 @@ const GenerateDocument = () => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/documents/templates`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/templates`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -82,8 +85,33 @@ const GenerateDocument = () => {
     }
   }
 
+  const fetchEmployees = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      
+      if (!token) {
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/employees`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setEmployees(data.employees || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch employees:', error)
+    }
+  }
+
   const handleTemplateSelect = (template) => {
     setSelectedTemplate(template)
+    setSelectedEmployee(null)
     setIsPreviewMode(false)
     
     // Initialize field values with empty strings
@@ -113,6 +141,10 @@ const GenerateDocument = () => {
 
   const generatePreview = () => {
     if (!selectedTemplate) return
+    if (!selectedEmployee) {
+      toast.error('Please select an employee first')
+      return
+    }
     
     try {
       const preview = replacePlaceholders(selectedTemplate.content, fieldValues)
@@ -126,6 +158,11 @@ const GenerateDocument = () => {
   const validateFields = () => {
     if (!selectedTemplate) {
       setError('Please select a template')
+      return false
+    }
+
+    if (!selectedEmployee) {
+      setError('Please select an employee')
       return false
     }
 
@@ -151,7 +188,7 @@ const GenerateDocument = () => {
       setError('')
       
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/documents/generate`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -159,6 +196,7 @@ const GenerateDocument = () => {
         },
         body: JSON.stringify({
           template_id: selectedTemplate.id,
+          employee_id: selectedEmployee.id,
           field_values: fieldValues
         })
       })
@@ -200,6 +238,7 @@ const GenerateDocument = () => {
 
   const resetForm = () => {
     setSelectedTemplate(null)
+    setSelectedEmployee(null)
     setFieldValues({})
     setPreviewContent('')
     setIsPreviewMode(false)
@@ -217,7 +256,7 @@ const GenerateDocument = () => {
     try {
       setDeletingTemplate(template.id)
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/documents/templates/${template.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/templates/${template.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -372,8 +411,42 @@ const GenerateDocument = () => {
             )}
           </div>
 
-          {/* Field Values Form */}
+          {/* Employee Selection */}
           {selectedTemplate && (
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Select Employee
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Employee
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <select
+                    value={selectedEmployee?.id || ''}
+                    onChange={(e) => {
+                      const employee = employees.find(emp => emp.id === e.target.value)
+                      setSelectedEmployee(employee)
+                    }}
+                    className="input-field"
+                    required
+                  >
+                    <option value="">Select an employee</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.full_name} ({employee.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Field Values Form */}
+          {selectedTemplate && selectedEmployee && (
             <div className="card p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Enter Document Values
@@ -400,7 +473,7 @@ const GenerateDocument = () => {
               <div className="flex space-x-3 mt-6">
                 <button
                   onClick={generatePreview}
-                  disabled={!Object.values(fieldValues).some(value => value.trim() !== '')}
+                  disabled={!selectedEmployee || !Object.values(fieldValues).some(value => value.trim() !== '')}
                   className="btn-secondary flex items-center"
                 >
                   <Eye className="h-4 w-4 mr-2" />
@@ -418,7 +491,7 @@ const GenerateDocument = () => {
           )}
 
           {/* Preview Section */}
-          {isPreviewMode && previewContent && (
+          {isPreviewMode && previewContent && selectedEmployee && (
             <div className="card p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Document Preview</h3>
@@ -474,9 +547,10 @@ const GenerateDocument = () => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">How to Generate</h3>
             <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
               <p>1. <strong>Select a template</strong> - Choose from available document templates</p>
-              <p>2. <strong>Fill in the fields</strong> - Enter values for all required fields</p>
-              <p>3. <strong>Preview</strong> - Review how your document will look</p>
-              <p>4. <strong>Download</strong> - Generate and download the PDF document</p>
+              <p>2. <strong>Select an employee</strong> - Choose the employee for this document</p>
+              <p>3. <strong>Fill in the fields</strong> - Enter values for all required fields</p>
+              <p>4. <strong>Preview</strong> - Review how your document will look</p>
+              <p>5. <strong>Download</strong> - Generate and download the PDF document</p>
             </div>
           </div>
 
@@ -495,6 +569,7 @@ const GenerateDocument = () => {
             <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-4">Tips</h3>
             <ul className="space-y-2 text-sm text-yellow-800 dark:text-yellow-200">
               <li>• All fields marked with * are required</li>
+              <li>• Employee selection is required for document generation</li>
               <li>• Preview your document before downloading</li>
               <li>• PDF will maintain exact formatting and fonts</li>
               <li>• Generated documents are automatically named with date</li>

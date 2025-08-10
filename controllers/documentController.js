@@ -4,6 +4,25 @@ const puppeteer = require('puppeteer')
 // Get all document templates for the company
 const getDocumentTemplates = async (req, res) => {
   try {
+    // Add logging to debug company isolation
+    console.log('User company_id:', req.user.company_id)
+    console.log('User ID:', req.user.id)
+    console.log('User role:', req.user.role)
+
+    // First, let's check if there are any templates without company_id (orphaned templates)
+    const { data: orphanedTemplates, error: orphanedError } = await supabase
+      .from('document_templates')
+      .select('id, document_name, company_id, created_at')
+      .is('company_id', null)
+
+    if (orphanedError) {
+      console.error('Error checking for orphaned templates:', orphanedError)
+    } else if (orphanedTemplates && orphanedTemplates.length > 0) {
+      console.log('Found orphaned templates without company_id:', orphanedTemplates.length)
+      // Optionally, you could clean these up or assign them to a default company
+    }
+
+    // Get templates for the current company with strict filtering
     const { data: templates, error } = await supabase
       .from('document_templates')
       .select('*')
@@ -12,14 +31,43 @@ const getDocumentTemplates = async (req, res) => {
       .order('created_at', { ascending: false })
 
     if (error) {
+      console.error('Database error fetching templates:', error)
       return res.status(500).json({ 
         error: 'Failed to fetch templates',
         details: error.message 
       })
     }
 
-    res.json({ templates: templates || [] })
+    // Additional validation - double-check that all returned templates belong to the company
+    const validTemplates = templates.filter(template => {
+      if (template.company_id !== req.user.company_id) {
+        console.error('Template with wrong company_id found:', {
+          template_id: template.id,
+          template_company_id: template.company_id,
+          user_company_id: req.user.company_id
+        })
+        return false
+      }
+      return true
+    })
+
+    if (validTemplates.length !== templates.length) {
+      console.warn(`Filtered out ${templates.length - validTemplates.length} templates with wrong company_id`)
+    }
+
+    console.log(`Returning ${validTemplates.length} templates for company ${req.user.company_id}`)
+
+    res.json({ 
+      templates: validTemplates || [],
+      debug_info: {
+        user_company_id: req.user.company_id,
+        total_templates_found: templates?.length || 0,
+        valid_templates_returned: validTemplates?.length || 0,
+        orphaned_templates_found: orphanedTemplates?.length || 0
+      }
+    })
   } catch (error) {
+    console.error('GetDocumentTemplates error:', error)
     res.status(500).json({ 
       error: 'Internal server error',
       details: error.message 
@@ -87,6 +135,16 @@ const createDocumentTemplate = async (req, res) => {
       })
     }
 
+    // Ensure company_id is set
+    if (!req.user.company_id) {
+      console.error('User has no company_id:', req.user)
+      return res.status(400).json({ 
+        error: 'User has no company assigned' 
+      })
+    }
+
+    console.log('Creating template for company:', req.user.company_id)
+
     // Create template
     const { data: template, error } = await supabase
       .from('document_templates')
@@ -103,17 +161,25 @@ const createDocumentTemplate = async (req, res) => {
       .single()
 
     if (error) {
+      console.error('Template creation error:', error)
       return res.status(500).json({ 
         error: 'Failed to create template',
         details: error.message 
       })
     }
 
+    console.log('Template created successfully:', {
+      template_id: template.id,
+      company_id: template.company_id,
+      document_name: template.document_name
+    })
+
     res.status(201).json({ 
       message: 'Template created successfully',
       template 
     })
   } catch (error) {
+    console.error('CreateDocumentTemplate error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -220,11 +286,11 @@ const deleteDocumentTemplate = async (req, res) => {
 // Generate document from template
 const generateDocument = async (req, res) => {
   try {
-    const { template_id, field_values } = req.body
+    const { template_id, employee_id, field_values } = req.body
 
-    if (!template_id || !field_values) {
+    if (!template_id || !employee_id || !field_values) {
       return res.status(400).json({ 
-        error: 'Template ID and field values are required' 
+        error: 'Template ID, employee ID, and field values are required' 
       })
     }
 
@@ -241,11 +307,43 @@ const generateDocument = async (req, res) => {
       return res.status(404).json({ error: 'Template not found' })
     }
 
+    // Get employee
+    const { data: employee, error: employeeError } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('id', employee_id)
+      .eq('company_id', req.user.company_id)
+      .eq('is_active', true)
+      .single()
+
+    if (employeeError || !employee) {
+      return res.status(404).json({ error: 'Employee not found' })
+    }
+
     // Replace placeholders with values
     let generatedContent = template.content
+    
+    // Replace field tag placeholders
     template.field_tags.forEach(field => {
       const placeholder = `{{${field.tag}}}`
       const value = field_values[field.tag] || `[${field.label}]`
+      generatedContent = generatedContent.replace(new RegExp(placeholder, 'g'), value)
+    })
+    
+    // Replace employee data placeholders
+    const employeePlaceholders = {
+      '{{employee_name}}': employee.full_name,
+      '{{employee_email}}': employee.email,
+      '{{employee_id}}': employee.id,
+      '{{employee_position}}': employee.position || '[Position]',
+      '{{employee_department}}': employee.department || '[Department]',
+      '{{employee_hire_date}}': employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : '[Hire Date]',
+      '{{company_name}}': req.user.company_name || '[Company Name]',
+      '{{generated_date}}': new Date().toLocaleDateString(),
+      '{{generated_time}}': new Date().toLocaleTimeString()
+    }
+    
+    Object.entries(employeePlaceholders).forEach(([placeholder, value]) => {
       generatedContent = generatedContent.replace(new RegExp(placeholder, 'g'), value)
     })
 
@@ -254,7 +352,7 @@ const generateDocument = async (req, res) => {
 
     // Set response headers for PDF download
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `attachment; filename="${template.document_name}_${new Date().toISOString().split('T')[0]}.pdf"`)
+    res.setHeader('Content-Disposition', `attachment; filename="${template.document_name}_${employee.full_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf"`)
     res.setHeader('Content-Length', pdfBuffer.length)
     
     res.send(pdfBuffer)
@@ -512,11 +610,68 @@ const generatePDFFromHTML = async (htmlContent) => {
   }
 }
 
+// Clean up orphaned templates (admin only)
+const cleanupOrphanedTemplates = async (req, res) => {
+  try {
+    // Only allow admins to run cleanup
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can perform cleanup operations' })
+    }
+
+    console.log('Starting cleanup of orphaned templates...')
+
+    // Find templates without company_id
+    const { data: orphanedTemplates, error: findError } = await supabase
+      .from('document_templates')
+      .select('id, document_name, created_at')
+      .is('company_id', null)
+
+    if (findError) {
+      console.error('Error finding orphaned templates:', findError)
+      return res.status(500).json({ error: 'Failed to find orphaned templates' })
+    }
+
+    if (!orphanedTemplates || orphanedTemplates.length === 0) {
+      return res.json({ 
+        message: 'No orphaned templates found',
+        cleaned_count: 0
+      })
+    }
+
+    console.log(`Found ${orphanedTemplates.length} orphaned templates`)
+
+    // Option 1: Delete orphaned templates (recommended for security)
+    const { error: deleteError } = await supabase
+      .from('document_templates')
+      .delete()
+      .is('company_id', null)
+
+    if (deleteError) {
+      console.error('Error deleting orphaned templates:', deleteError)
+      return res.status(500).json({ error: 'Failed to delete orphaned templates' })
+    }
+
+    console.log(`Successfully cleaned up ${orphanedTemplates.length} orphaned templates`)
+
+    res.json({ 
+      message: 'Cleanup completed successfully',
+      cleaned_count: orphanedTemplates.length,
+      action: 'deleted',
+      templates_cleaned: orphanedTemplates.map(t => ({ id: t.id, name: t.document_name }))
+    })
+
+  } catch (error) {
+    console.error('Cleanup error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
 module.exports = {
   getDocumentTemplates,
   getDocumentTemplate,
   createDocumentTemplate,
   updateDocumentTemplate,
   deleteDocumentTemplate,
-  generateDocument
+  generateDocument,
+  cleanupOrphanedTemplates
 } 

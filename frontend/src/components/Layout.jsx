@@ -59,6 +59,7 @@ const Layout = ({ children }) => {
     { name: 'Company Calendar', href: '/company-calendar', icon: '📅' },
     { name: 'Company Profile', href: '/company-profile', icon: '🏢' },
     { name: 'Profile', href: '/profile', icon: '👤' },
+    { name: 'Admin Tools', href: '/admin-tools', icon: '⚙️', adminOnly: true },
   ]
 
   return (
