@@ -22,7 +22,6 @@
       "source": "/api/users/employees",
       "destination": "/api/employees"
     },
-
     {
       "source": "/api/auth/add-hr-staff",
       "destination": "/api/hr-staff"
@@ -31,8 +30,26 @@
       "source": "/api/auth/add-hr-manager",
       "destination": "/api/hr-staff"
     },
-
-
+    {
+      "source": "/api/documents/templates",
+      "destination": "/api/templates"
+    },
+    {
+      "source": "/api/documents/generate",
+      "destination": "/api/documents"
+    },
+    {
+      "source": "/api/leaves",
+      "destination": "/api/leave-management"
+    },
+    {
+      "source": "/api/salary",
+      "destination": "/api/salary-management"
+    },
+    {
+      "source": "/api/debug-user",
+      "destination": "/api/debug-user"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
