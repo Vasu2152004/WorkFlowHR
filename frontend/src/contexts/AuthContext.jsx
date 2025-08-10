@@ -6,10 +6,10 @@ import { toast } from 'react-hot-toast'
 const getApiBaseUrl = () => {
   // If we're in production (deployed), use the same domain
   if (window.location.hostname !== 'localhost') {
-    return `${window.location.origin}/api`
+    return `${window.location.origin}`
   }
   // Otherwise use localhost for development
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
 }
 
 const API_BASE_URL = getApiBaseUrl()

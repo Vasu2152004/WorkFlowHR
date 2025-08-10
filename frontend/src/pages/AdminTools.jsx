@@ -30,7 +30,7 @@ const AdminTools = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/api/documents/templates`, {
+      const response = await fetch(`${API_BASE_URL}/documents/templates`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -59,7 +59,7 @@ const AdminTools = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/api/documents/templates/cleanup`, {
+      const response = await fetch(`${API_BASE_URL}/documents/templates/cleanup`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -51,7 +51,7 @@ const GenerateDocument = () => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/documents/templates`, {
+      const response = await fetch(`${API_BASE_URL}/documents/templates`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -93,7 +93,7 @@ const GenerateDocument = () => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/employees`, {
+      const response = await fetch(`${API_BASE_URL}/employees`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -188,7 +188,7 @@ const GenerateDocument = () => {
       setError('')
       
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/api/documents/generate`, {
+      const response = await fetch(`${API_BASE_URL}/documents/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,7 +256,7 @@ const GenerateDocument = () => {
     try {
       setDeletingTemplate(template.id)
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/api/documents/templates/${template.id}`, {
+      const response = await fetch(`${API_BASE_URL}/documents/templates/${template.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

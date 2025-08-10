@@ -84,10 +84,9 @@ const EditTemplate = () => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/documents/templates/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/documents/templates/${id}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -268,7 +267,7 @@ const EditTemplate = () => {
 
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/api/documents/templates/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/documents/templates/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
