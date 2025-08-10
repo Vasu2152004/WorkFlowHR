@@ -295,7 +295,7 @@ const getProfile = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(user);
+    res.json({ user: user });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }

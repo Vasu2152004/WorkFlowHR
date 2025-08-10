@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import CalendarWidget from '../components/CalendarWidget'
+import RoleUpdater from '../components/RoleUpdater'
 
 const Dashboard = () => {
   const { user, API_BASE_URL } = useAuth()
@@ -449,6 +450,18 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Role Updater - Development Tool */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Development Tools
+          </h3>
+        </div>
+        <div className="p-6">
+          <RoleUpdater />
         </div>
       </div>
 
