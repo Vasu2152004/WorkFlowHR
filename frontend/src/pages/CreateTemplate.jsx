@@ -263,13 +263,13 @@ const CreateTemplate = () => {
     setShowThemes(false)
   }
 
-  if (!user || user.role !== 'hr') {
+  if (!user || !['hr', 'hr_manager', 'admin'].includes(user.role)) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600">Only HR users can create document templates.</p>
+          <p className="text-gray-600">Only HR users, HR managers, and admins can create document templates.</p>
         </div>
       </div>
     )

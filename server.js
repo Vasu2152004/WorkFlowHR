@@ -51,6 +51,7 @@ try {
   const salaryRoutes = require('./routes/salary')
   const workingDaysRoutes = require('./routes/workingDays')
   const companyCalendarRoutes = require('./routes/companyCalendar')
+  const debugRoutes = require('./routes/debug')
 
   // API routes
   app.use('/api/auth', authRoutes)
@@ -62,6 +63,7 @@ try {
   app.use('/api/salary', salaryRoutes)
   app.use('/api/working-days', workingDaysRoutes)
   app.use('/api/company-calendar', companyCalendarRoutes)
+  app.use('/api/debug', debugRoutes)
 
   console.log('✅ All routes loaded successfully')
 } catch (error) {
