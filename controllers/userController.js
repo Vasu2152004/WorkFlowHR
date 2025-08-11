@@ -4,6 +4,9 @@ const { generateEmployeePassword, generateEmployeeId } = require('../utils/passw
 // Add employee (HR/HR Manager/Admin only) - Comprehensive creation
 const addEmployee = async (req, res) => {
   try {
+    console.log('addEmployee called with data:', JSON.stringify(req.body, null, 2));
+    console.log('Current user:', JSON.stringify(req.user, null, 2));
+    
     const { 
       email, 
       full_name, 
@@ -21,6 +24,12 @@ const addEmployee = async (req, res) => {
     } = req.body;
     
     const currentUser = req.user;
+
+    // Check if Supabase is properly configured
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return res.status(503).json({ error: 'Database not configured properly' });
+    }
 
     // Check if user has permission to add employees
     if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
@@ -115,6 +124,8 @@ const addEmployee = async (req, res) => {
     };
 
     // Insert into employees table using admin client to bypass RLS
+    console.log('Attempting to insert employee data:', JSON.stringify(employeeData, null, 2));
+    
     const { data: employeeRecord, error: employeeError } = await supabaseAdmin
       .from('employees')
       .insert([employeeData])
@@ -122,6 +133,7 @@ const addEmployee = async (req, res) => {
       .single();
 
     if (employeeError) {
+      console.error('Employee creation error:', employeeError);
       // If employee creation fails, delete both auth user and user record
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       await supabaseAdmin.from('users').delete().eq('id', authData.user.id);
@@ -162,16 +174,24 @@ const addEmployee = async (req, res) => {
       };
 
       // Send email (this will work if email is configured)
-      const emailResponse = await fetch('http://localhost:3000/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(emailData)
-      });
+      try {
+        const emailResponse = await fetch('http://localhost:3000/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(emailData)
+        });
 
-      if (!emailResponse.ok) {
-        // Email sending failed, but employee created successfully
+        if (!emailResponse.ok) {
+          console.warn('Email sending failed, but employee created successfully');
+        } else {
+          console.log('Welcome email sent successfully');
+        }
+      } catch (fetchError) {
+        console.warn('Email fetch error:', fetchError.message);
+        // Continue execution - email failure shouldn't break employee creation
       }
     } catch (emailError) {
+      console.warn('Email functionality error:', emailError.message);
       // Email functionality not available, but employee created successfully
     }
 
@@ -193,7 +213,34 @@ const addEmployee = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error in addEmployee:', error);
+    
+    // Check for specific error types
+    if (error.code === '23505') { // Unique constraint violation
+      return res.status(400).json({ error: 'Employee with this email already exists' });
+    }
+    
+    if (error.code === '23503') { // Foreign key constraint violation
+      return res.status(400).json({ error: 'Invalid reference data (e.g., team lead not found)' });
+    }
+    
+    if (error.message && error.message.includes('duplicate key')) {
+      return res.status(400).json({ error: 'Employee with this email or employee ID already exists' });
+    }
+    
+    // Log the full error for debugging
+    console.error('Full error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      stack: error.stack
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to create employee',
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 };
 
@@ -201,6 +248,12 @@ const addEmployee = async (req, res) => {
 const getEmployees = async (req, res) => {
   try {
     const currentUser = req.user;
+
+    // Check if Supabase is properly configured
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return res.status(503).json({ error: 'Database not configured properly' });
+    }
 
     // Build base query with proper joins
     let query = supabaseAdmin
@@ -269,6 +322,12 @@ const getEmployee = async (req, res) => {
     const { id } = req.params;
     const currentUser = req.user;
 
+    // Check if Supabase is properly configured
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return res.status(503).json({ error: 'Database not configured properly' });
+    }
+
     // Build query with role-based access
     let query = supabaseAdmin
       .from('employees')
@@ -330,6 +389,12 @@ const updateEmployee = async (req, res) => {
       bank_account,
       leave_balance
     } = req.body;
+
+    // Check if Supabase is properly configured
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return res.status(503).json({ error: 'Database not configured properly' });
+    }
 
     // Validate required fields
     if (!full_name || !email || !department || !designation || !salary || !joining_date) {
@@ -404,6 +469,12 @@ const deleteEmployee = async (req, res) => {
     const { id } = req.params;
     const currentUser = req.user;
 
+    // Check if Supabase is properly configured
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return res.status(503).json({ error: 'Database not configured properly' });
+    }
+
     // Check if user has permission to delete employees
     if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
       return res.status(403).json({ error: 'Access denied' });
@@ -459,6 +530,12 @@ const resetEmployeePassword = async (req, res) => {
   try {
     const { id } = req.params;
     const currentUser = req.user;
+
+    // Check if Supabase is properly configured
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return res.status(503).json({ error: 'Database not configured properly' });
+    }
 
     // Check if user has permission to reset employee passwords
     if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
@@ -565,6 +642,12 @@ const updateCompanyProfile = async (req, res) => {
       vision,
       values
     } = req.body;
+
+    // Check if Supabase is properly configured
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return res.status(503).json({ error: 'Database not configured properly' });
+    }
 
     // Validate required fields
     if (!name) {

@@ -1,19 +1,29 @@
 const { createClient } = require('@supabase/supabase-js')
 
-export default async function handler(req, res) {
+// Netlify serverless function handler
+exports.handler = async (event, context) => {
   // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
   }
 
-  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'DELETE') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  // Handle preflight OPTIONS request
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    }
+  }
+
+  if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST' && event.httpMethod !== 'PUT' && event.httpMethod !== 'DELETE') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    }
   }
 
   try {
@@ -21,22 +31,34 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ error: 'Database configuration missing' })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Database configuration missing' })
+      }
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get Authorization header
-    const authHeader = req.headers.authorization
+    const authHeader = event.headers.authorization
     if (!authHeader) {
-      return res.status(401).json({ error: 'Authorization header missing' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Authorization header missing' })
+      }
     }
 
     const token = authHeader.replace('Bearer ', '')
     
     // Extract user ID from token
     if (!token.startsWith('demo-token-')) {
-      return res.status(401).json({ error: 'Invalid token format' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token format' })
+      }
     }
 
     const userId = token.replace('demo-token-', '')
@@ -49,1036 +71,857 @@ export default async function handler(req, res) {
       .single()
 
     if (userError || !currentUser) {
-      return res.status(401).json({ error: 'Invalid token - user not found' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token - user not found' })
+      }
     }
 
     if (!currentUser.company_id) {
-      return res.status(400).json({ error: 'User has no company assigned' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'User has no company assigned' })
+      }
     }
 
     // Handle different HTTP methods
-    switch (req.method) {
+    switch (event.httpMethod) {
       case 'GET':
-        return await handleGetSalaryData(req, res, supabase, currentUser)
+        return await handleGetSalaryData(event, headers, supabase, currentUser)
       case 'POST':
-        return await handleCreateSalaryData(req, res, supabase, currentUser)
+        return await handleCreateSalaryData(event, headers, supabase, currentUser)
       case 'PUT':
-        return await handleUpdateSalaryData(req, res, supabase, currentUser)
+        return await handleUpdateSalaryData(event, headers, supabase, currentUser)
       case 'DELETE':
-        return await handleDeleteSalaryData(req, res, supabase, currentUser)
+        return await handleDeleteSalaryData(event, headers, supabase, currentUser)
       default:
-        return res.status(405).json({ error: 'Method not allowed' })
+        return {
+          statusCode: 405,
+          headers,
+          body: JSON.stringify({ error: 'Method not allowed' })
+        }
     }
 
   } catch (error) {
     console.error('Salary Management API error:', error)
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message
-    })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message
+      })
+    }
   }
 }
 
 // Get salary data (slips, components, deductions)
-async function handleGetSalaryData(req, res, supabase, currentUser) {
+async function handleGetSalaryData(event, headers, supabase, currentUser) {
   try {
-    const { type, employee_id, month, year, slip_id } = req.query
+    const { type, employee_id, month, year, slip_id } = event.queryStringParameters || {}
     
     // Handle different types of salary data requests
     if (type === 'components') {
-      return await getSalaryComponents(res, supabase, currentUser)
+      return await getSalaryComponents(headers, supabase, currentUser)
     } else if (type === 'slips') {
-      return await getSalarySlips(res, supabase, currentUser, { employee_id, month, year })
+      return await getSalarySlips(headers, supabase, currentUser, { employee_id, month, year })
     } else if (type === 'slip-details') {
-      return await getSalarySlipDetails(res, supabase, currentUser, slip_id)
+      return await getSalarySlipDetails(headers, supabase, currentUser, slip_id)
     } else if (type === 'deductions') {
-      return await getFixedDeductions(res, supabase, currentUser, employee_id)
+      return await getFixedDeductions(headers, supabase, currentUser, employee_id)
     } else if (type === 'summary') {
-      return await getSalarySummary(res, supabase, currentUser)
+      return await getSalarySummary(headers, supabase, currentUser)
     } else {
       // Default: return all salary data
-      return await getAllSalaryData(res, supabase, currentUser)
+      return await getAllSalaryData(headers, supabase, currentUser)
     }
 
   } catch (error) {
     console.error('Get salary data error:', error)
-    return res.status(500).json({ error: 'Failed to fetch salary data' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get salary components
-async function getSalaryComponents(res, supabase, currentUser) {
+async function getSalaryComponents(headers, supabase, currentUser) {
   try {
     const { data: components, error } = await supabase
       .from('salary_components')
       .select('*')
       .eq('company_id', currentUser.company_id)
-      .eq('is_active', true)
       .order('name', { ascending: true })
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch salary components' })
+      }
     }
 
-    res.status(200).json({
-      success: true,
-      components: components || [],
-      total: components?.length || 0
-    })
-
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(components)
+    }
   } catch (error) {
-    console.error('Get salary components error:', error)
-    return res.status(500).json({ error: 'Failed to fetch salary components' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get salary slips
-async function getSalarySlips(res, supabase, currentUser, filters) {
+async function getSalarySlips(headers, supabase, currentUser, filters) {
   try {
-    const { employee_id, month, year } = filters
-    
     let query = supabase
       .from('salary_slips')
-      .select(`
-        *,
-        users!inner(full_name, email)
-      `)
+      .select('*')
       .eq('company_id', currentUser.company_id)
 
-    // Apply filters
-    if (employee_id) {
-      query = query.eq('employee_id', employee_id)
+    if (filters.employee_id) {
+      query = query.eq('employee_id', filters.employee_id)
     }
-    if (month) {
-      query = query.eq('month', parseInt(month))
+    if (filters.month) {
+      query = query.eq('month', filters.month)
     }
-    if (year) {
-      query = query.eq('year', parseInt(year))
-    }
-
-    // If user is not HR, only show their own slips
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      query = query.eq('employee_id', currentUser.id)
+    if (filters.year) {
+      query = query.eq('year', filters.year)
     }
 
-    const { data: salarySlips, error } = await query
-      .order('year', { ascending: false })
-      .order('month', { ascending: false })
+    const { data: slips, error } = await query.order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch salary slips' })
+      }
     }
 
-    res.status(200).json({
-      success: true,
-      salary_slips: salarySlips || [],
-      total: salarySlips?.length || 0
-    })
-
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(slips)
+    }
   } catch (error) {
-    console.error('Get salary slips error:', error)
-    return res.status(500).json({ error: 'Failed to fetch salary slips' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get salary slip details
-async function getSalarySlipDetails(res, supabase, currentUser, slipId) {
+async function getSalarySlipDetails(headers, supabase, currentUser, slipId) {
   try {
     if (!slipId) {
-      return res.status(400).json({ error: 'Slip ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Slip ID is required' })
+      }
     }
 
-    const { data: slipDetails, error } = await supabase
+    const { data: slip, error } = await supabase
       .from('salary_slips')
-      .select(`
-        *,
-        users!inner(full_name, email),
-        salary_components!inner(name, component_type)
-      `)
+      .select('*')
       .eq('id', slipId)
       .eq('company_id', currentUser.company_id)
       .single()
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch salary slip details' })
+      }
     }
 
-    if (!slipDetails) {
-      return res.status(404).json({ error: 'Salary slip not found' })
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(slip)
     }
-
-    // Check permissions
-    if (slipDetails.employee_id !== currentUser.id && 
-        !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'You can only view your own salary slips' })
-    }
-
-    res.status(200).json({
-      success: true,
-      slip_details: slipDetails
-    })
-
   } catch (error) {
-    console.error('Get salary slip details error:', error)
-    return res.status(500).json({ error: 'Failed to fetch salary slip details' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get fixed deductions
-async function getFixedDeductions(res, supabase, currentUser, employeeId) {
+async function getFixedDeductions(headers, supabase, currentUser, employeeId) {
   try {
     const targetEmployeeId = employeeId || currentUser.id
-
-    // Check if user has permission to view other employee's deductions
-    if (employeeId && employeeId !== currentUser.id && 
-        !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'You can only view your own deductions' })
-    }
 
     const { data: deductions, error } = await supabase
       .from('fixed_deductions')
       .select('*')
       .eq('employee_id', targetEmployeeId)
       .eq('company_id', currentUser.company_id)
-      .eq('is_active', true)
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch fixed deductions' })
+      }
     }
 
-    res.status(200).json({
-      success: true,
-      employee_id: targetEmployeeId,
-      deductions: deductions || [],
-      total: deductions?.length || 0
-    })
-
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(deductions)
+    }
   } catch (error) {
-    console.error('Get fixed deductions error:', error)
-    return res.status(500).json({ error: 'Failed to fetch fixed deductions' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get salary summary
-async function getSalarySummary(res, supabase, currentUser) {
+async function getSalarySummary(headers, supabase, currentUser) {
   try {
-    // Get summary statistics
     const { data: summary, error } = await supabase
       .from('salary_slips')
-      .select('month, year, gross_salary, net_salary')
+      .select('month, year, count, total_amount')
       .eq('company_id', currentUser.company_id)
+      .group('month, year')
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch salary summary' })
+      }
     }
 
-    // Calculate summary
-    const summaryData = {
-      total_slips: summary?.length || 0,
-      total_gross: summary?.reduce((sum, slip) => sum + (slip.gross_salary || 0), 0) || 0,
-      total_net: summary?.reduce((sum, slip) => sum + (slip.net_salary || 0), 0) || 0,
-      average_gross: summary?.length ? (summary.reduce((sum, slip) => sum + (slip.gross_salary || 0), 0) / summary.length) : 0,
-      average_net: summary?.length ? (summary.reduce((sum, slip) => sum + (slip.net_salary || 0), 0) / summary.length) : 0
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(summary)
     }
-
-    res.status(200).json({
-      success: true,
-      summary: summaryData
-    })
-
   } catch (error) {
-    console.error('Get salary summary error:', error)
-    return res.status(500).json({ error: 'Failed to fetch salary summary' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get all salary data
-async function getAllSalaryData(res, supabase, currentUser) {
+async function getAllSalaryData(headers, supabase, currentUser) {
   try {
-    // Get components, slips, and deductions in parallel
-    const [componentsResult, slipsResult, deductionsResult] = await Promise.all([
-      supabase
-        .from('salary_components')
-        .select('*')
-        .eq('company_id', currentUser.company_id)
-        .eq('is_active', true),
-      supabase
-        .from('salary_slips')
-        .select('*')
-        .eq('company_id', currentUser.company_id)
-        .eq('employee_id', currentUser.id)
-        .order('year', { ascending: false })
-        .order('month', { ascending: false }),
-      supabase
-        .from('fixed_deductions')
-        .select('*')
-        .eq('employee_id', currentUser.id)
-        .eq('company_id', currentUser.company_id)
-        .eq('is_active', true)
+    const [components, slips, deductions] = await Promise.all([
+      getSalaryComponents(headers, supabase, currentUser),
+      getSalarySlips(headers, supabase, currentUser, {}),
+      getFixedDeductions(headers, supabase, currentUser)
     ])
 
-    if (componentsResult.error || slipsResult.error || deductionsResult.error) {
-      console.error('Database error:', componentsResult.error || slipsResult.error || deductionsResult.error)
-      return res.status(500).json({ error: 'Failed to fetch salary data' })
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        salary_components: JSON.parse(components.body),
+        salary_slips: JSON.parse(slips.body),
+        fixed_deductions: JSON.parse(deductions.body)
+      })
     }
-
-    res.status(200).json({
-      success: true,
-      components: componentsResult.data || [],
-      salary_slips: slipsResult.data || [],
-      deductions: deductionsResult.data || [],
-      summary: {
-        total_slips: slipsResult.data?.length || 0,
-        total_deductions: deductionsResult.data?.length || 0,
-        total_components: componentsResult.data?.length || 0
-      }
-    })
-
   } catch (error) {
-    console.error('Get all salary data error:', error)
-    return res.status(500).json({ error: 'Failed to fetch salary data' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
-// Create salary data (components, slips, deductions)
-async function handleCreateSalaryData(req, res, supabase, currentUser) {
+// Create salary data
+async function handleCreateSalaryData(event, headers, supabase, currentUser) {
   try {
-    const { action } = req.body
+    const { action, ...data } = JSON.parse(event.body)
+
+    if (!action) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Action is required' })
+      }
+    }
 
     switch (action) {
-      case 'generate-slip':
-        return await generateSalarySlip(req, res, supabase, currentUser)
-      case 'add-component':
-        return await addSalaryComponent(req, res, supabase, currentUser)
-      case 'add-deduction':
-        return await addFixedDeduction(req, res, supabase, currentUser)
+      case 'generate_slip':
+        return await generateSalarySlip(data, headers, supabase, currentUser)
+      case 'add_component':
+        return await addSalaryComponent(data, headers, supabase, currentUser)
+      case 'add_deduction':
+        return await addFixedDeduction(data, headers, supabase, currentUser)
       default:
-        return res.status(400).json({ error: 'Invalid action. Use: generate-slip, add-component, or add-deduction' })
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Invalid action' })
+        }
     }
 
   } catch (error) {
     console.error('Create salary data error:', error)
-    return res.status(500).json({ error: 'Failed to create salary data' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Generate salary slip
-async function generateSalarySlip(req, res, supabase, currentUser) {
+async function generateSalarySlip(data, headers, supabase, currentUser) {
   try {
-    // Check if user has HR permissions
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can generate salary slips' })
-    }
-
-    const {
-      employee_id,
-      month,
-      year,
-      basic_salary,
-      additions = [],
-      deductions = [],
-      notes = ''
-    } = req.body
+    const { employee_id, month, year, basic_salary, allowances, deductions } = data
 
     if (!employee_id || !month || !year || !basic_salary) {
-      return res.status(400).json({ 
-        error: 'Employee ID, month, year, and basic salary are required' 
-      })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
+      }
     }
 
-    // Validate month and year
-    if (month < 1 || month > 12) {
-      return res.status(400).json({ error: 'Month must be between 1 and 12' })
-    }
-    if (year < 2020 || year > 2030) {
-      return res.status(400).json({ error: 'Year must be between 2020 and 2030' })
-    }
-
-    // Check if employee exists and belongs to the company
-    const { data: employee, error: employeeError } = await supabase
-      .from('users')
-      .select('id, full_name, email')
-      .eq('id', employee_id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (employeeError || !employee) {
-      return res.status(404).json({ error: 'Employee not found' })
-    }
-
-    // Check if slip already exists for this month/year
-    const { data: existingSlip, error: checkError } = await supabase
-      .from('salary_slips')
-      .select('id')
-      .eq('employee_id', employee_id)
-      .eq('month', month)
-      .eq('year', year)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (existingSlip) {
-      return res.status(409).json({ error: 'Salary slip already exists for this month and year' })
-    }
-
-    // Calculate salary
-    const grossSalary = basic_salary + (additions.reduce((sum, add) => sum + (add.amount || 0), 0))
-    const totalDeductions = deductions.reduce((sum, ded) => sum + (ded.amount || 0), 0)
-    const netSalary = grossSalary - totalDeductions
-
-    // Generate UUID for new salary slip
-    const { randomUUID } = require('crypto')
-    const slipId = randomUUID()
+    // Calculate total salary
+    const totalAllowances = allowances ? Object.values(allowances).reduce((sum, val) => sum + (val || 0), 0) : 0
+    const totalDeductions = deductions ? Object.values(deductions).reduce((sum, val) => sum + (val || 0), 0) : 0
+    const netSalary = basic_salary + totalAllowances - totalDeductions
 
     // Create salary slip
-    const { data: newSlip, error: createError } = await supabase
+    const { data: slip, error } = await supabase
       .from('salary_slips')
       .insert([{
-        id: slipId,
         employee_id,
-        company_id: currentUser.company_id,
         month,
         year,
         basic_salary,
-        gross_salary: grossSalary,
+        allowances: allowances || {},
+        deductions: deductions || {},
         net_salary: netSalary,
-        additions: additions || [],
-        deductions: deductions || [],
-        notes: notes || '',
-        generated_by: currentUser.id,
-        generated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        company_id: currentUser.company_id,
+        created_by: currentUser.id
       }])
       .select()
       .single()
 
-    if (createError) {
-      console.error('Salary slip creation error:', createError)
-      return res.status(500).json({ 
-        error: 'Failed to generate salary slip',
-        message: createError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to create salary slip' })
+      }
+    }
+
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify({
+        message: 'Salary slip generated successfully',
+        salary_slip: slip
       })
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Salary slip generated successfully',
-      salary_slip: {
-        ...newSlip,
-        employee_name: employee.full_name
-      }
-    })
-
   } catch (error) {
-    console.error('Generate salary slip error:', error)
-    return res.status(500).json({ error: 'Failed to generate salary slip' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Add salary component
-async function addSalaryComponent(req, res, supabase, currentUser) {
+async function addSalaryComponent(data, headers, supabase, currentUser) {
   try {
-    // Check if user has HR permissions
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can add salary components' })
+    const { name, type, value, description } = data
+
+    if (!name || !type || !value) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
+      }
     }
 
-    const {
-      name,
-      description,
-      component_type,
-      is_percentage = false,
-      default_value = 0
-    } = req.body
-
-    if (!name || !component_type) {
-      return res.status(400).json({ 
-        error: 'Component name and type are required' 
-      })
-    }
-
-    if (!['addition', 'deduction'].includes(component_type)) {
-      return res.status(400).json({ 
-        error: 'Component type must be either "addition" or "deduction"' 
-      })
-    }
-
-    // Generate UUID for new component
-    const { randomUUID } = require('crypto')
-    const componentId = randomUUID()
-
-    // Create salary component
-    const { data: newComponent, error: createError } = await supabase
+    const { data: component, error } = await supabase
       .from('salary_components')
       .insert([{
-        id: componentId,
         name,
-        description: description || '',
-        component_type,
-        is_percentage,
-        default_value,
+        type,
+        value,
+        description,
         company_id: currentUser.company_id,
-        created_by: currentUser.id,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        created_by: currentUser.id
       }])
       .select()
       .single()
 
-    if (createError) {
-      console.error('Salary component creation error:', createError)
-      return res.status(500).json({ 
-        error: 'Failed to add salary component',
-        message: createError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to create salary component' })
+      }
+    }
+
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify({
+        message: 'Salary component added successfully',
+        component
       })
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Salary component added successfully',
-      component: newComponent
-    })
-
   } catch (error) {
-    console.error('Add salary component error:', error)
-    return res.status(500).json({ error: 'Failed to add salary component' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Add fixed deduction
-async function addFixedDeduction(req, res, supabase, currentUser) {
+async function addFixedDeduction(data, headers, supabase, currentUser) {
   try {
-    // Check if user has HR permissions
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can add fixed deductions' })
+    const { employee_id, name, amount, description } = data
+
+    if (!employee_id || !name || !amount) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
+      }
     }
 
-    const {
-      employee_id,
-      deduction_name,
-      deduction_type,
-      amount,
-      percentage,
-      description = ''
-    } = req.body
-
-    if (!employee_id || !deduction_name || !deduction_type) {
-      return res.status(400).json({ 
-        error: 'Employee ID, deduction name, and type are required' 
-      })
-    }
-
-    if (!['fixed', 'percentage'].includes(deduction_type)) {
-      return res.status(400).json({ 
-        error: 'Deduction type must be either "fixed" or "percentage"' 
-      })
-    }
-
-    if (deduction_type === 'fixed' && (!amount || amount <= 0)) {
-      return res.status(400).json({ error: 'Amount is required for fixed deductions' })
-    }
-
-    if (deduction_type === 'percentage' && (!percentage || percentage <= 0 || percentage > 100)) {
-      return res.status(400).json({ error: 'Valid percentage (1-100) is required for percentage deductions' })
-    }
-
-    // Check if employee exists and belongs to the company
-    const { data: employee, error: employeeError } = await supabase
-      .from('users')
-      .select('id, full_name')
-      .eq('id', employee_id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (employeeError || !employee) {
-      return res.status(404).json({ error: 'Employee not found' })
-    }
-
-    // Generate UUID for new deduction
-    const { randomUUID } = require('crypto')
-    const deductionId = randomUUID()
-
-    // Create fixed deduction
-    const { data: newDeduction, error: createError } = await supabase
+    const { data: deduction, error } = await supabase
       .from('fixed_deductions')
       .insert([{
-        id: deductionId,
         employee_id,
-        company_id: currentUser.company_id,
-        deduction_name,
-        deduction_type,
-        amount: deduction_type === 'fixed' ? amount : null,
-        percentage: deduction_type === 'percentage' ? percentage : null,
+        name,
+        amount,
         description,
-        created_by: currentUser.id,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        company_id: currentUser.company_id,
+        created_by: currentUser.id
       }])
       .select()
       .single()
 
-    if (createError) {
-      console.error('Fixed deduction creation error:', createError)
-      return res.status(500).json({ 
-        error: 'Failed to add fixed deduction',
-        message: createError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to create fixed deduction' })
+      }
+    }
+
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify({
+        message: 'Fixed deduction added successfully',
+        deduction
       })
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Fixed deduction added successfully',
-      deduction: {
-        ...newDeduction,
-        employee_name: employee.full_name
-      }
-    })
-
   } catch (error) {
-    console.error('Add fixed deduction error:', error)
-    return res.status(500).json({ error: 'Failed to add fixed deduction' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Update salary data
-async function handleUpdateSalaryData(req, res, supabase, currentUser) {
+async function handleUpdateSalaryData(event, headers, supabase, currentUser) {
   try {
-    const { action } = req.body
+    const { action, ...data } = JSON.parse(event.body)
+
+    if (!action) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Action is required' })
+      }
+    }
 
     switch (action) {
-      case 'update-slip':
-        return await updateSalarySlip(req, res, supabase, currentUser)
-      case 'update-component':
-        return await updateSalaryComponent(req, res, supabase, currentUser)
-      case 'update-deduction':
-        return await updateFixedDeduction(req, res, supabase, currentUser)
+      case 'update_slip':
+        return await updateSalarySlip(data, headers, supabase, currentUser)
+      case 'update_component':
+        return await updateSalaryComponent(data, headers, supabase, currentUser)
+      case 'update_deduction':
+        return await updateFixedDeduction(data, headers, supabase, currentUser)
       default:
-        return res.status(400).json({ error: 'Invalid action. Use: update-slip, update-component, or update-deduction' })
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Invalid action' })
+        }
     }
 
   } catch (error) {
     console.error('Update salary data error:', error)
-    return res.status(500).json({ error: 'Failed to update salary data' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Update salary slip
-async function updateSalarySlip(req, res, supabase, currentUser) {
+async function updateSalarySlip(data, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
+    const { id, basic_salary, allowances, deductions } = data
+
     if (!id) {
-      return res.status(400).json({ error: 'Slip ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Slip ID is required' })
+      }
     }
 
-    // Check if slip exists and belongs to the company
-    const { data: existingSlip, error: fetchError } = await supabase
+    // Calculate new net salary
+    const totalAllowances = allowances ? Object.values(allowances).reduce((sum, val) => sum + (val || 0), 0) : 0
+    const totalDeductions = deductions ? Object.values(deductions).reduce((sum, val) => sum + (val || 0), 0) : 0
+    const netSalary = basic_salary + totalAllowances - totalDeductions
+
+    const { data: updatedSlip, error } = await supabase
       .from('salary_slips')
-      .select('*')
+      .update({
+        basic_salary,
+        allowances: allowances || {},
+        deductions: deductions || {},
+        net_salary: netSalary,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', id)
       .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingSlip) {
-      return res.status(404).json({ error: 'Salary slip not found' })
-    }
-
-    // Check permissions - only HR can update slips
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can update salary slips' })
-    }
-
-    const {
-      basic_salary,
-      additions,
-      deductions,
-      notes
-    } = req.body
-
-    // Update slip
-    const updateData = {
-      updated_at: new Date().toISOString()
-    }
-
-    if (basic_salary !== undefined) updateData.basic_salary = basic_salary
-    if (additions !== undefined) updateData.additions = additions
-    if (deductions !== undefined) updateData.deductions = deductions
-    if (notes !== undefined) updateData.notes = notes
-
-    // Recalculate totals if basic salary or components changed
-    if (basic_salary !== undefined || additions !== undefined || deductions !== undefined) {
-      const newBasicSalary = basic_salary !== undefined ? basic_salary : existingSlip.basic_salary
-      const newAdditions = additions !== undefined ? additions : existingSlip.additions
-      const newDeductions = deductions !== undefined ? deductions : existingSlip.deductions
-
-      const grossSalary = newBasicSalary + (newAdditions.reduce((sum, add) => sum + (add.amount || 0), 0))
-      const totalDeductions = newDeductions.reduce((sum, ded) => sum + (ded.amount || 0), 0)
-      const netSalary = grossSalary - totalDeductions
-
-      updateData.gross_salary = grossSalary
-      updateData.net_salary = netSalary
-    }
-
-    const { data: updatedSlip, error: updateError } = await supabase
-      .from('salary_slips')
-      .update(updateData)
-      .eq('id', id)
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Salary slip update error:', updateError)
-      return res.status(500).json({ 
-        error: 'Failed to update salary slip',
-        message: updateError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to update salary slip' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Salary slip updated successfully',
+        salary_slip: updatedSlip
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Salary slip updated successfully',
-      salary_slip: updatedSlip
-    })
-
   } catch (error) {
-    console.error('Update salary slip error:', error)
-    return res.status(500).json({ error: 'Failed to update salary slip' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Update salary component
-async function updateSalaryComponent(req, res, supabase, currentUser) {
+async function updateSalaryComponent(data, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
+    const { id, name, type, value, description } = data
+
     if (!id) {
-      return res.status(400).json({ error: 'Component ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Component ID is required' })
+      }
     }
 
-    // Check if component exists and belongs to the company
-    const { data: existingComponent, error: fetchError } = await supabase
+    const { data: updatedComponent, error } = await supabase
       .from('salary_components')
-      .select('*')
+      .update({
+        name,
+        type,
+        value,
+        description,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', id)
       .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingComponent) {
-      return res.status(404).json({ error: 'Salary component not found' })
-    }
-
-    // Check permissions - only HR can update components
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can update salary components' })
-    }
-
-    const {
-      name,
-      description,
-      component_type,
-      is_percentage,
-      default_value,
-      is_active
-    } = req.body
-
-    // Update component
-    const updateData = {
-      updated_at: new Date().toISOString()
-    }
-
-    if (name !== undefined) updateData.name = name
-    if (description !== undefined) updateData.description = description
-    if (component_type !== undefined) updateData.component_type = component_type
-    if (is_percentage !== undefined) updateData.is_percentage = is_percentage
-    if (default_value !== undefined) updateData.default_value = default_value
-    if (is_active !== undefined) updateData.is_active = is_active
-
-    const { data: updatedComponent, error: updateError } = await supabase
-      .from('salary_components')
-      .update(updateData)
-      .eq('id', id)
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Salary component update error:', updateError)
-      return res.status(500).json({ 
-        error: 'Failed to update salary component',
-        message: updateError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to update salary component' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Salary component updated successfully',
+        component: updatedComponent
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Salary component updated successfully',
-      component: updatedComponent
-    })
-
   } catch (error) {
-    console.error('Update salary component error:', error)
-    return res.status(500).json({ error: 'Failed to update salary component' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Update fixed deduction
-async function updateFixedDeduction(req, res, supabase, currentUser) {
+async function updateFixedDeduction(data, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
+    const { id, name, amount, description } = data
+
     if (!id) {
-      return res.status(400).json({ error: 'Deduction ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Deduction ID is required' })
+      }
     }
 
-    // Check if deduction exists and belongs to the company
-    const { data: existingDeduction, error: fetchError } = await supabase
+    const { data: updatedDeduction, error } = await supabase
       .from('fixed_deductions')
-      .select('*')
+      .update({
+        name,
+        amount,
+        description,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', id)
       .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingDeduction) {
-      return res.status(404).json({ error: 'Fixed deduction not found' })
-    }
-
-    // Check permissions - only HR can update deductions
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can update fixed deductions' })
-    }
-
-    const {
-      deduction_name,
-      deduction_type,
-      amount,
-      percentage,
-      description,
-      is_active
-    } = req.body
-
-    // Update deduction
-    const updateData = {
-      updated_at: new Date().toISOString()
-    }
-
-    if (deduction_name !== undefined) updateData.deduction_name = deduction_name
-    if (deduction_type !== undefined) updateData.deduction_type = deduction_type
-    if (amount !== undefined) updateData.amount = amount
-    if (percentage !== undefined) updateData.percentage = percentage
-    if (description !== undefined) updateData.description = description
-    if (is_active !== undefined) updateData.is_active = is_active
-
-    const { data: updatedDeduction, error: updateError } = await supabase
-      .from('fixed_deductions')
-      .update(updateData)
-      .eq('id', id)
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Fixed deduction update error:', updateError)
-      return res.status(500).json({ 
-        error: 'Failed to update fixed deduction',
-        message: updateError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to update fixed deduction' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Fixed deduction updated successfully',
+        deduction: updatedDeduction
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Fixed deduction updated successfully',
-      deduction: updatedDeduction
-    })
-
   } catch (error) {
-    console.error('Update fixed deduction error:', error)
-    return res.status(500).json({ error: 'Failed to update fixed deduction' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Delete salary data
-async function handleDeleteSalaryData(req, res, supabase, currentUser) {
+async function handleDeleteSalaryData(event, headers, supabase, currentUser) {
   try {
-    const { action } = req.body
+    const { action, ...data } = JSON.parse(event.body)
+
+    if (!action) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Action is required' })
+      }
+    }
 
     switch (action) {
-      case 'delete-slip':
-        return await deleteSalarySlip(req, res, supabase, currentUser)
-      case 'delete-component':
-        return await deleteSalaryComponent(req, res, supabase, currentUser)
-      case 'delete-deduction':
-        return await deleteFixedDeduction(req, res, supabase, currentUser)
+      case 'delete_slip':
+        return await deleteSalarySlip(data, headers, supabase, currentUser)
+      case 'delete_component':
+        return await deleteSalaryComponent(data, headers, supabase, currentUser)
+      case 'delete_deduction':
+        return await deleteFixedDeduction(data, headers, supabase, currentUser)
       default:
-        return res.status(400).json({ error: 'Invalid action. Use: delete-slip, delete-component, or delete-deduction' })
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Invalid action' })
+        }
     }
 
   } catch (error) {
     console.error('Delete salary data error:', error)
-    return res.status(500).json({ error: 'Failed to delete salary data' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Delete salary slip
-async function deleteSalarySlip(req, res, supabase, currentUser) {
+async function deleteSalarySlip(data, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
+    const { id } = data
+
     if (!id) {
-      return res.status(400).json({ error: 'Slip ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Slip ID is required' })
+      }
     }
 
-    // Check if slip exists and belongs to the company
-    const { data: existingSlip, error: fetchError } = await supabase
-      .from('salary_slips')
-      .select('*')
-      .eq('id', id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingSlip) {
-      return res.status(404).json({ error: 'Salary slip not found' })
-    }
-
-    // Check permissions - only HR can delete slips
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can delete salary slips' })
-    }
-
-    // Delete slip
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('salary_slips')
       .delete()
       .eq('id', id)
+      .eq('company_id', currentUser.company_id)
 
-    if (deleteError) {
-      console.error('Salary slip deletion error:', deleteError)
-      return res.status(500).json({ 
-        error: 'Failed to delete salary slip',
-        message: deleteError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to delete salary slip' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Salary slip deleted successfully'
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Salary slip deleted successfully',
-      deleted_slip: {
-        id: existingSlip.id,
-        month: existingSlip.month,
-        year: existingSlip.year
-      }
-    })
-
   } catch (error) {
-    console.error('Delete salary slip error:', error)
-    return res.status(500).json({ error: 'Failed to delete salary slip' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Delete salary component
-async function deleteSalaryComponent(req, res, supabase, currentUser) {
+async function deleteSalaryComponent(data, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
+    const { id } = data
+
     if (!id) {
-      return res.status(400).json({ error: 'Component ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Component ID is required' })
+      }
     }
 
-    // Check if component exists and belongs to the company
-    const { data: existingComponent, error: fetchError } = await supabase
-      .from('salary_components')
-      .select('*')
-      .eq('id', id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingComponent) {
-      return res.status(404).json({ error: 'Salary component not found' })
-    }
-
-    // Check permissions - only HR can delete components
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can delete salary components' })
-    }
-
-    // Delete component
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('salary_components')
       .delete()
       .eq('id', id)
+      .eq('company_id', currentUser.company_id)
 
-    if (deleteError) {
-      console.error('Salary component deletion error:', deleteError)
-      return res.status(500).json({ 
-        error: 'Failed to delete salary component',
-        message: deleteError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to delete salary component' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Salary component deleted successfully'
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Salary component deleted successfully',
-      deleted_component: {
-        id: existingComponent.id,
-        name: existingComponent.name
-      }
-    })
-
   } catch (error) {
-    console.error('Delete salary component error:', error)
-    return res.status(500).json({ error: 'Failed to delete salary component' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Delete fixed deduction
-async function deleteFixedDeduction(req, res, supabase, currentUser) {
+async function deleteFixedDeduction(data, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
+    const { id } = data
+
     if (!id) {
-      return res.status(400).json({ error: 'Deduction ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Deduction ID is required' })
+      }
     }
 
-    // Check if deduction exists and belongs to the company
-    const { data: existingDeduction, error: fetchError } = await supabase
-      .from('fixed_deductions')
-      .select('*')
-      .eq('id', id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingDeduction) {
-      return res.status(404).json({ error: 'Fixed deduction not found' })
-    }
-
-    // Check permissions - only HR can delete deductions
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can delete fixed deductions' })
-    }
-
-    // Delete deduction
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('fixed_deductions')
       .delete()
       .eq('id', id)
+      .eq('company_id', currentUser.company_id)
 
-    if (deleteError) {
-      console.error('Fixed deduction deletion error:', deleteError)
-      return res.status(500).json({ 
-        error: 'Failed to delete fixed deduction',
-        message: deleteError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to delete fixed deduction' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Fixed deduction deleted successfully'
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Fixed deduction deleted successfully',
-      deleted_deduction: {
-        id: existingDeduction.id,
-        name: existingDeduction.deduction_name
-      }
-    })
-
   } catch (error) {
-    console.error('Delete fixed deduction error:', error)
-    return res.status(500).json({ error: 'Failed to delete fixed deduction' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }

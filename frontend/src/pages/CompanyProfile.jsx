@@ -66,7 +66,7 @@ const CompanyProfile = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3000/api/users/company/profile', {
+      const response = await fetch(`${API_BASE_URL}/users/company/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -162,7 +162,7 @@ const CompanyProfile = () => {
   const handleSave = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/users/company/profile', {
+      const response = await fetch(`${API_BASE_URL}/users/company/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

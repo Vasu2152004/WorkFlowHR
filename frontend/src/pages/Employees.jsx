@@ -55,7 +55,7 @@ const Employees = () => {
       // Try main endpoint first
       let employees = []
       try {
-        const response = await fetch(`${API_BASE_URL}/users/employees`, {
+        const response = await fetch(`${API_BASE_URL}/employees`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -173,7 +173,7 @@ const Employees = () => {
   const handleDeleteEmployee = async (employeeId) => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/users/employees?employee_id=${employeeId}`, {
+              const response = await fetch(`${API_BASE_URL}/employees?employee_id=${employeeId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

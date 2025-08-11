@@ -1,19 +1,29 @@
 const { createClient } = require('@supabase/supabase-js')
 
-export default async function handler(req, res) {
+// Netlify serverless function handler
+exports.handler = async (event, context) => {
   // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
   }
 
-  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'DELETE') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  // Handle preflight OPTIONS request
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    }
+  }
+
+  if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST' && event.httpMethod !== 'PUT' && event.httpMethod !== 'DELETE') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    }
   }
 
   try {
@@ -21,22 +31,34 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ error: 'Database configuration missing' })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Database configuration missing' })
+      }
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get Authorization header
-    const authHeader = req.headers.authorization
+    const authHeader = event.headers.authorization
     if (!authHeader) {
-      return res.status(401).json({ error: 'Authorization header missing' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Authorization header missing' })
+      }
     }
 
     const token = authHeader.replace('Bearer ', '')
     
     // Extract user ID from token
     if (!token.startsWith('demo-token-')) {
-      return res.status(401).json({ error: 'Invalid token format' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token format' })
+      }
     }
 
     const userId = token.replace('demo-token-', '')
@@ -49,100 +71,117 @@ export default async function handler(req, res) {
       .single()
 
     if (userError || !currentUser) {
-      return res.status(401).json({ error: 'Invalid token - user not found' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token - user not found' })
+      }
     }
 
     if (!currentUser.company_id) {
-      return res.status(400).json({ error: 'User has no company assigned' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'User has no company assigned' })
+      }
     }
 
     // Handle different HTTP methods
-    switch (req.method) {
+    switch (event.httpMethod) {
       case 'GET':
-        return await handleGetLeaveData(req, res, supabase, currentUser)
+        return await handleGetLeaveData(event, headers, supabase, currentUser)
       case 'POST':
-        return await handleCreateLeaveRequest(req, res, supabase, currentUser)
+        return await handleCreateLeaveRequest(event, headers, supabase, currentUser)
       case 'PUT':
-        return await handleUpdateLeaveRequest(req, res, supabase, currentUser)
+        return await handleUpdateLeaveRequest(event, headers, supabase, currentUser)
       case 'DELETE':
-        return await handleDeleteLeaveRequest(req, res, supabase, currentUser)
+        return await handleDeleteLeaveRequest(event, headers, supabase, currentUser)
       default:
-        return res.status(405).json({ error: 'Method not allowed' })
+        return {
+          statusCode: 405,
+          headers,
+          body: JSON.stringify({ error: 'Method not allowed' })
+        }
     }
 
   } catch (error) {
     console.error('Leave Management API error:', error)
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message
-    })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message
+      })
+    }
   }
 }
 
 // Get leave data (requests, balances, types)
-async function handleGetLeaveData(req, res, supabase, currentUser) {
+async function handleGetLeaveData(event, headers, supabase, currentUser) {
   try {
-    const { type, employee_id, status, start_date, end_date } = req.query
+    const { type, employee_id, status, start_date, end_date } = event.queryStringParameters || {}
     
     // Handle different types of leave data requests
     if (type === 'types') {
-      return await getLeaveTypes(res, supabase, currentUser)
+      return await getLeaveTypes(headers, supabase, currentUser)
     } else if (type === 'balance') {
-      return await getLeaveBalance(res, supabase, currentUser, employee_id)
+      return await getLeaveBalance(headers, supabase, currentUser, employee_id)
     } else if (type === 'requests') {
-      return await getLeaveRequests(res, supabase, currentUser, { employee_id, status, start_date, end_date })
+      return await getLeaveRequests(headers, supabase, currentUser, { employee_id, status, start_date, end_date })
     } else if (type === 'summary') {
-      return await getLeaveSummary(res, supabase, currentUser)
+      return await getLeaveSummary(headers, supabase, currentUser)
     } else {
       // Default: return all leave data
-      return await getAllLeaveData(res, supabase, currentUser)
+      return await getAllLeaveData(headers, supabase, currentUser)
     }
 
   } catch (error) {
     console.error('Get leave data error:', error)
-    return res.status(500).json({ error: 'Failed to fetch leave data' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get leave types
-async function getLeaveTypes(res, supabase, currentUser) {
+async function getLeaveTypes(headers, supabase, currentUser) {
   try {
     const { data: leaveTypes, error } = await supabase
       .from('leave_types')
       .select('*')
       .eq('company_id', currentUser.company_id)
-      .eq('is_active', true)
       .order('name', { ascending: true })
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch leave types' })
+      }
     }
 
-    res.status(200).json({
-      success: true,
-      leave_types: leaveTypes || [],
-      total: leaveTypes?.length || 0
-    })
-
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(leaveTypes)
+    }
   } catch (error) {
-    console.error('Get leave types error:', error)
-    return res.status(500).json({ error: 'Failed to fetch leave types' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
-// Get leave balance for employee
-async function getLeaveBalance(res, supabase, currentUser, employeeId) {
+// Get leave balance for an employee
+async function getLeaveBalance(headers, supabase, currentUser, employeeId) {
   try {
     const targetEmployeeId = employeeId || currentUser.id
 
-    // Check if user has permission to view other employee's balance
-    if (employeeId && employeeId !== currentUser.id && 
-        !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'You can only view your own leave balance' })
-    }
-
-    // Get employee's leave balance
     const { data: leaveBalance, error } = await supabase
       .from('leave_balances')
       .select('*')
@@ -150,392 +189,301 @@ async function getLeaveBalance(res, supabase, currentUser, employeeId) {
       .eq('company_id', currentUser.company_id)
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch leave balance' })
+      }
     }
 
-    res.status(200).json({
-      success: true,
-      employee_id: targetEmployeeId,
-      leave_balance: leaveBalance || [],
-      total: leaveBalance?.length || 0
-    })
-
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(leaveBalance)
+    }
   } catch (error) {
-    console.error('Get leave balance error:', error)
-    return res.status(500).json({ error: 'Failed to fetch leave balance' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get leave requests
-async function getLeaveRequests(res, supabase, currentUser, filters) {
+async function getLeaveRequests(headers, supabase, currentUser, filters) {
   try {
-    const { employee_id, status, start_date, end_date } = filters
-    
     let query = supabase
       .from('leave_requests')
-      .select(`
-        *,
-        users!inner(full_name, email),
-        leave_types!inner(name, color)
-      `)
+      .select('*')
       .eq('company_id', currentUser.company_id)
 
-    // Apply filters
-    if (employee_id) {
-      query = query.eq('employee_id', employee_id)
+    if (filters.employee_id) {
+      query = query.eq('employee_id', filters.employee_id)
     }
-    if (status) {
-      query = query.eq('status', status)
+    if (filters.status) {
+      query = query.eq('status', filters.status)
     }
-    if (start_date) {
-      query = query.gte('start_date', start_date)
+    if (filters.start_date) {
+      query = query.gte('start_date', filters.start_date)
     }
-    if (end_date) {
-      query = query.lte('end_date', end_date)
-    }
-
-    // If user is not HR, only show their own requests
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      query = query.eq('employee_id', currentUser.id)
+    if (filters.end_date) {
+      query = query.lte('end_date', filters.end_date)
     }
 
-    const { data: leaveRequests, error } = await query
-      .order('created_at', { ascending: false })
+    const { data: leaveRequests, error } = await query.order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch leave requests' })
+      }
     }
 
-    res.status(200).json({
-      success: true,
-      leave_requests: leaveRequests || [],
-      total: leaveRequests?.length || 0
-    })
-
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(leaveRequests)
+    }
   } catch (error) {
-    console.error('Get leave requests error:', error)
-    return res.status(500).json({ error: 'Failed to fetch leave requests' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get leave summary
-async function getLeaveSummary(res, supabase, currentUser) {
+async function getLeaveSummary(headers, supabase, currentUser) {
   try {
-    // Get summary statistics
     const { data: summary, error } = await supabase
       .from('leave_requests')
-      .select('status, leave_type_id')
+      .select('status, count')
       .eq('company_id', currentUser.company_id)
+      .group('status')
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch leave summary' })
+      }
     }
 
-    // Calculate summary
-    const summaryData = {
-      total_requests: summary?.length || 0,
-      pending: summary?.filter(r => r.status === 'pending').length || 0,
-      approved: summary?.filter(r => r.status === 'approved').length || 0,
-      rejected: summary?.filter(r => r.status === 'rejected').length || 0,
-      cancelled: summary?.filter(r => r.status === 'cancelled').length || 0
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(summary)
     }
-
-    res.status(200).json({
-      success: true,
-      summary: summaryData
-    })
-
   } catch (error) {
-    console.error('Get leave summary error:', error)
-    return res.status(500).json({ error: 'Failed to fetch leave summary' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Get all leave data
-async function getAllLeaveData(res, supabase, currentUser) {
+async function getAllLeaveData(headers, supabase, currentUser) {
   try {
-    // Get leave types, requests, and balance in parallel
-    const [leaveTypesResult, leaveRequestsResult, leaveBalanceResult] = await Promise.all([
-      supabase
-        .from('leave_types')
-        .select('*')
-        .eq('company_id', currentUser.company_id)
-        .eq('is_active', true),
-      supabase
-        .from('leave_requests')
-        .select('*')
-        .eq('company_id', currentUser.company_id)
-        .eq('employee_id', currentUser.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('leave_balances')
-        .select('*')
-        .eq('employee_id', currentUser.id)
-        .eq('company_id', currentUser.company_id)
+    const [leaveTypes, leaveBalance, leaveRequests] = await Promise.all([
+      getLeaveTypes(headers, supabase, currentUser),
+      getLeaveBalance(headers, supabase, currentUser),
+      getLeaveRequests(headers, supabase, currentUser, {})
     ])
 
-    if (leaveTypesResult.error || leaveRequestsResult.error || leaveBalanceResult.error) {
-      console.error('Database error:', leaveTypesResult.error || leaveRequestsResult.error || leaveBalanceResult.error)
-      return res.status(500).json({ error: 'Failed to fetch leave data' })
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        leave_types: JSON.parse(leaveTypes.body),
+        leave_balance: JSON.parse(leaveBalance.body),
+        leave_requests: JSON.parse(leaveRequests.body)
+      })
     }
-
-    res.status(200).json({
-      success: true,
-      leave_types: leaveTypesResult.data || [],
-      leave_requests: leaveRequestsResult.data || [],
-      leave_balance: leaveBalanceResult.data || [],
-      summary: {
-        total_requests: leaveRequestsResult.data?.length || 0,
-        pending: leaveRequestsResult.data?.filter(r => r.status === 'pending').length || 0,
-        approved: leaveRequestsResult.data?.filter(r => r.status === 'approved').length || 0,
-        rejected: leaveRequestsResult.data?.filter(r => r.status === 'rejected').length || 0
-      }
-    })
-
   } catch (error) {
-    console.error('Get all leave data error:', error)
-    return res.status(500).json({ error: 'Failed to fetch leave data' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Create leave request
-async function handleCreateLeaveRequest(req, res, supabase, currentUser) {
+async function handleCreateLeaveRequest(event, headers, supabase, currentUser) {
   try {
-    const {
-      leave_type_id,
-      start_date,
-      end_date,
-      reason,
-      half_day = false,
-      half_day_type = null
-    } = req.body
+    const { employee_id, leave_type_id, start_date, end_date, reason, half_day, half_day_type } = JSON.parse(event.body)
 
-    if (!leave_type_id || !start_date || !end_date || !reason) {
-      return res.status(400).json({ 
-        error: 'Leave type, start date, end date, and reason are required' 
-      })
+    // Validation
+    if (!employee_id || !leave_type_id || !start_date || !end_date) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
+      }
     }
 
-    // Validate dates
-    const startDate = new Date(start_date)
-    const endDate = new Date(end_date)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    if (startDate < today) {
-      return res.status(400).json({ error: 'Start date cannot be in the past' })
+    // Check if dates are valid
+    const start = new Date(start_date)
+    const end = new Date(end_date)
+    if (start > end) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Start date cannot be after end date' })
+      }
     }
 
-    if (endDate < startDate) {
-      return res.status(400).json({ error: 'End date cannot be before start date' })
-    }
-
-    // Check if leave type exists and belongs to the company
-    const { data: leaveType, error: leaveTypeError } = await supabase
-      .from('leave_types')
-      .select('*')
-      .eq('id', leave_type_id)
-      .eq('company_id', currentUser.company_id)
-      .eq('is_active', true)
-      .single()
-
-    if (leaveTypeError || !leaveType) {
-      return res.status(404).json({ error: 'Leave type not found or inactive' })
-    }
-
-    // Calculate number of days (excluding weekends)
-    const workingDays = calculateWorkingDays(startDate, endDate, half_day, half_day_type)
-
-    // Check leave balance
-    const { data: leaveBalance, error: balanceError } = await supabase
-      .from('leave_balances')
-      .select('*')
-      .eq('employee_id', currentUser.id)
-      .eq('leave_type_id', leave_type_id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (balanceError) {
-      console.error('Balance check error:', balanceError)
-      return res.status(500).json({ error: 'Failed to check leave balance' })
-    }
-
-    if (!leaveBalance || leaveBalance.remaining_days < workingDays) {
-      return res.status(400).json({ 
-        error: 'Insufficient leave balance',
-        available: leaveBalance?.remaining_days || 0,
-        requested: workingDays
-      })
-    }
-
-    // Generate UUID for new leave request
-    const { randomUUID } = require('crypto')
-    const requestId = randomUUID()
+    // Calculate working days
+    const workingDays = calculateWorkingDays(start_date, end_date, half_day, half_day_type)
 
     // Create leave request
-    const { data: newRequest, error: createError } = await supabase
+    const { data: leaveRequest, error } = await supabase
       .from('leave_requests')
       .insert([{
-        id: requestId,
-        employee_id: currentUser.id,
+        employee_id,
         leave_type_id,
-        company_id: currentUser.company_id,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
+        start_date,
+        end_date,
         reason,
-        half_day,
-        half_day_type,
-        days_requested: workingDays,
+        working_days: workingDays,
         status: 'pending',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        company_id: currentUser.company_id,
+        created_by: currentUser.id
       }])
       .select()
       .single()
 
-    if (createError) {
-      console.error('Leave request creation error:', createError)
-      return res.status(500).json({ 
-        error: 'Failed to create leave request',
-        message: createError.message 
-      })
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to create leave request' })
+      }
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Leave request created successfully',
-      leave_request: {
-        ...newRequest,
-        leave_type_name: leaveType.name
-      }
-    })
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify({
+        message: 'Leave request created successfully',
+        leave_request: leaveRequest
+      })
+    }
 
   } catch (error) {
     console.error('Create leave request error:', error)
-    return res.status(500).json({ error: 'Failed to create leave request' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
-// Update leave request (approve/reject/update)
-async function handleUpdateLeaveRequest(req, res, supabase, currentUser) {
+// Update leave request
+async function handleUpdateLeaveRequest(event, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
-    if (!id) {
-      return res.status(400).json({ error: 'Leave request ID is required' })
+    const { id, status, approved_by, comments } = JSON.parse(event.body)
+
+    if (!id || !status) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Leave request ID and status are required' })
+      }
     }
 
-    const {
-      status,
-      reason,
-      start_date,
-      end_date,
-      half_day,
-      half_day_type,
-      admin_notes
-    } = req.body
-
-    // Check if leave request exists and belongs to the company
-    const { data: existingRequest, error: fetchError } = await supabase
-      .from('leave_requests')
-      .select('*')
-      .eq('id', id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingRequest) {
-      return res.status(404).json({ error: 'Leave request not found' })
-    }
-
-    // Check permissions
-    if (status && !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can update leave request status' })
-    }
-
-    if (existingRequest.employee_id !== currentUser.id && 
-        !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'You can only update your own leave requests' })
+    // Check if user has permission to approve/reject
+    if (['approved', 'rejected'].includes(status) && !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Only HR staff can approve/reject leave requests' })
+      }
     }
 
     // Update leave request
-    const updateData = {
-      updated_at: new Date().toISOString()
-    }
-
-    if (status !== undefined) updateData.status = status
-    if (reason !== undefined) updateData.reason = reason
-    if (start_date !== undefined) updateData.start_date = start_date
-    if (end_date !== undefined) updateData.end_date = end_date
-    if (half_day !== undefined) updateData.half_day = half_day
-    if (half_day_type !== undefined) updateData.half_day_type = half_day_type
-    if (admin_notes !== undefined) updateData.admin_notes = admin_notes
-
-    // If dates changed, recalculate days
-    if (start_date || end_date) {
-      const startDate = new Date(start_date || existingRequest.start_date)
-      const endDate = new Date(end_date || existingRequest.end_date)
-      const workingDays = calculateWorkingDays(startDate, endDate, half_day || existingRequest.half_day, half_day_type || existingRequest.half_day_type)
-      updateData.days_requested = workingDays
-    }
-
-    const { data: updatedRequest, error: updateError } = await supabase
+    const { data: updatedRequest, error } = await supabase
       .from('leave_requests')
-      .update(updateData)
+      .update({
+        status,
+        approved_by: status !== 'pending' ? currentUser.id : null,
+        approved_at: status !== 'pending' ? new Date().toISOString() : null,
+        comments: comments || null
+      })
       .eq('id', id)
+      .eq('company_id', currentUser.company_id)
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Leave request update error:', updateError)
-      return res.status(500).json({ 
-        error: 'Failed to update leave request',
-        message: updateError.message 
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to update leave request' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Leave request updated successfully',
+        leave_request: updatedRequest
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Leave request updated successfully',
-      leave_request: updatedRequest
-    })
-
   } catch (error) {
     console.error('Update leave request error:', error)
-    return res.status(500).json({ error: 'Failed to update leave request' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Delete leave request
-async function handleDeleteLeaveRequest(req, res, supabase, currentUser) {
+async function handleDeleteLeaveRequest(event, headers, supabase, currentUser) {
   try {
-    const { id } = req.query
+    const { id } = JSON.parse(event.body)
+
     if (!id) {
-      return res.status(400).json({ error: 'Leave request ID is required' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Leave request ID is required' })
+      }
     }
 
-    // Check if leave request exists and belongs to the company
-    const { data: existingRequest, error: fetchError } = await supabase
+    // Check if user can delete this request
+    const { data: leaveRequest, error: fetchError } = await supabase
       .from('leave_requests')
       .select('*')
       .eq('id', id)
       .eq('company_id', currentUser.company_id)
       .single()
 
-    if (fetchError || !existingRequest) {
-      return res.status(404).json({ error: 'Leave request not found' })
+    if (fetchError || !leaveRequest) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Leave request not found' })
+      }
     }
 
-    // Check permissions - only HR or the request owner can delete
-    if (existingRequest.employee_id !== currentUser.id && 
-        !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'You can only delete your own leave requests' })
-    }
-
-    // Only allow deletion of pending requests
-    if (existingRequest.status !== 'pending') {
-      return res.status(400).json({ error: 'Only pending leave requests can be deleted' })
+    // Only allow deletion if request is pending or user is HR staff
+    if (leaveRequest.status !== 'pending' && !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Cannot delete approved/rejected leave requests' })
+      }
     }
 
     // Delete leave request
@@ -543,50 +491,56 @@ async function handleDeleteLeaveRequest(req, res, supabase, currentUser) {
       .from('leave_requests')
       .delete()
       .eq('id', id)
+      .eq('company_id', currentUser.company_id)
 
     if (deleteError) {
-      console.error('Leave request deletion error:', deleteError)
-      return res.status(500).json({ 
-        error: 'Failed to delete leave request',
-        message: deleteError.message 
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to delete leave request' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Leave request deleted successfully'
       })
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Leave request deleted successfully',
-      deleted_request: {
-        id: existingRequest.id,
-        start_date: existingRequest.start_date,
-        end_date: existingRequest.end_date
-      }
-    })
-
   } catch (error) {
     console.error('Delete leave request error:', error)
-    return res.status(500).json({ error: 'Failed to delete leave request' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
 // Helper function to calculate working days
 function calculateWorkingDays(startDate, endDate, halfDay = false, halfDayType = null) {
-  let days = 0
-  const current = new Date(startDate)
+  const start = new Date(startDate)
+  const end = new Date(endDate)
   
-  while (current <= endDate) {
+  let workingDays = 0
+  const current = new Date(start)
+  
+  while (current <= end) {
     // Skip weekends (Saturday = 6, Sunday = 0)
     if (current.getDay() !== 0 && current.getDay() !== 6) {
-      days++
+      workingDays++
     }
     current.setDate(current.getDate() + 1)
   }
   
-  // Handle half day
-  if (halfDay && halfDayType === 'start' && startDate.getTime() === endDate.getTime()) {
-    days = 0.5
-  } else if (halfDay && halfDayType === 'end' && startDate.getTime() === endDate.getTime()) {
-    days = 0.5
+  // Handle half days
+  if (halfDay && halfDayType === 'start' && start.getDay() !== 0 && start.getDay() !== 6) {
+    workingDays -= 0.5
+  } else if (halfDay && halfDayType === 'end' && end.getDay() !== 0 && end.getDay() !== 6) {
+    workingDays -= 0.5
   }
   
-  return days
+  return Math.max(0, workingDays)
 }

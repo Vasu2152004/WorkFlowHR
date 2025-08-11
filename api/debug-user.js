@@ -1,19 +1,29 @@
 const { createClient } = require('@supabase/supabase-js')
 
-export default async function handler(req, res) {
+// Netlify serverless function handler
+exports.handler = async (event, context) => {
   // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
   }
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  // Handle preflight OPTIONS request
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    }
+  }
+
+  if (event.httpMethod !== 'GET') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    }
   }
 
   try {
@@ -21,20 +31,32 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ error: 'Supabase configuration missing' })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Supabase configuration missing' })
+      }
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get authorization header
-    const authHeader = req.headers.authorization
+    const authHeader = event.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authorization header missing or invalid' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Authorization header missing or invalid' })
+      }
     }
 
     const token = authHeader.replace('Bearer ', '')
     if (!token.startsWith('demo-token-')) {
-      return res.status(401).json({ error: 'Invalid token format' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token format' })
+      }
     }
 
     const userId = token.replace('demo-token-', '')
@@ -47,7 +69,11 @@ export default async function handler(req, res) {
       .single()
 
     if (userError || !currentUser) {
-      return res.status(401).json({ error: 'Invalid token - user not found', details: userError })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token - user not found', details: userError })
+      }
     }
 
     // Check what permissions this user should have
@@ -63,39 +89,47 @@ export default async function handler(req, res) {
       .eq('company_id', currentUser.company_id)
       .order('role', { ascending: true })
 
-    res.status(200).json({
-      success: true,
-      currentUser: {
-        id: currentUser.id,
-        email: currentUser.email,
-        full_name: currentUser.full_name,
-        role: currentUser.role,
-        company_id: currentUser.company_id,
-        created_at: currentUser.created_at,
-        updated_at: currentUser.updated_at
-      },
-      permissions: {
-        isAdmin,
-        isHRManager,
-        isHR,
-        isEmployee,
-        canManageTemplates: isAdmin || isHRManager || isHR,
-        canManageDocuments: isAdmin || isHRManager || isHR,
-        canManageLeaves: isAdmin || isHRManager || isHR,
-        canManageSalary: isAdmin || isHRManager || isHR,
-        canManageHRStaff: isAdmin || isHRManager,
-        canCreateHRManager: isAdmin
-      },
-      companyUsers: companyUsers || [],
-      companyUsersError: companyUsersError?.message || null
-    })
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        currentUser: {
+          id: currentUser.id,
+          email: currentUser.email,
+          full_name: currentUser.full_name,
+          role: currentUser.role,
+          company_id: currentUser.company_id,
+          created_at: currentUser.created_at,
+          updated_at: currentUser.updated_at
+        },
+        permissions: {
+          isAdmin,
+          isHRManager,
+          isHR,
+          isEmployee,
+          canManageTemplates: isAdmin || isHRManager || isHR,
+          canManageDocuments: isAdmin || isHRManager || isHR,
+          canManageLeaves: isAdmin || isHRManager || isHR,
+          canManageSalary: isAdmin || isHRManager || isHR,
+          canManageHRStaff: isAdmin || isHRManager,
+          canCreateHRManager: isAdmin
+        },
+        companyUsers: companyUsers || [],
+        companyUsersError: companyUsersError?.message || null
+      })
+    }
 
   } catch (error) {
     console.error('Debug API error:', error)
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message,
-      stack: error.stack
-    })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message,
+        stack: error.stack
+      })
+    }
   }
 }

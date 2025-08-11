@@ -31,7 +31,7 @@ const LeaveRequest = () => {
   const fetchLeaveTypes = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/leaves/types', {
+              const response = await fetch(`${API_BASE_URL}/leaves/types`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -49,7 +49,7 @@ const LeaveRequest = () => {
   const fetchLeaveBalance = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`http://localhost:3000/api/leaves/balance/${user.id}`, {
+              const response = await fetch(`${API_BASE_URL}/leaves/balance/${user.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -67,7 +67,7 @@ const LeaveRequest = () => {
   const fetchLeaveRequests = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/leaves/requests', {
+      const response = await fetch(`${API_BASE_URL}/leaves/requests`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -85,7 +85,7 @@ const LeaveRequest = () => {
   const fetchEmployees = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/users/employees', {
+              const response = await fetch(`${API_BASE_URL}/employees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -107,7 +107,7 @@ const LeaveRequest = () => {
     try {
       const token = localStorage.getItem('access_token')
       
-      const response = await fetch('http://localhost:3000/api/leaves/requests', {
+      const response = await fetch(`${API_BASE_URL}/leaves/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -175,3 +175,6 @@ dump.rdb
 *.log.*
 logs/*.log 
 .vercel
+
+# Local Netlify folder
+.netlify

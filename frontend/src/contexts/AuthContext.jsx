@@ -4,9 +4,9 @@ import { toast } from 'react-hot-toast'
 
 // Auto-detect API URL based on environment
 const getApiBaseUrl = () => {
-  // If we're in production (deployed), use the same domain
+  // If we're in production (deployed), use Netlify functions
   if (window.location.hostname !== 'localhost') {
-    return `${window.location.origin}`
+    return `${window.location.origin}/.netlify/functions`
   }
   // Otherwise use localhost for development
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'

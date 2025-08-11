@@ -43,7 +43,7 @@ export default function EmployeeFixedDeductions() {
       }
 
       // Fetch employee details
-      const employeeResponse = await fetch(`${API_BASE_URL}/users/employees/${employee_id}`, {
+              const employeeResponse = await fetch(`${API_BASE_URL}/employees/${employee_id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

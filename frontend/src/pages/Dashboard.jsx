@@ -69,7 +69,7 @@ const Dashboard = () => {
         // Fallback to individual endpoints if dashboard fails
         let employees = []
         try {
-          const employeesResponse = await fetch(`${API_BASE_URL}/users/employees`, {
+          const employeesResponse = await fetch(`${API_BASE_URL}/employees`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

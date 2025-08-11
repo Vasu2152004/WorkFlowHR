@@ -1,19 +1,21 @@
 const { createClient } = require('@supabase/supabase-js')
 
-export default async function handler(req, res) {
+// Netlify serverless function handler
+exports.handler = async (event, context) => {
   // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
   }
 
-  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'DELETE') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  // Handle preflight OPTIONS request
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    }
   }
 
   try {
@@ -21,22 +23,34 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ error: 'Database configuration missing' })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Database configuration missing' })
+      }
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get Authorization header
-    const authHeader = req.headers.authorization
+    const authHeader = event.headers.authorization
     if (!authHeader) {
-      return res.status(401).json({ error: 'Authorization header missing' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Access token required' })
+      }
     }
 
     const token = authHeader.replace('Bearer ', '')
     
     // Extract user ID from token
     if (!token.startsWith('demo-token-')) {
-      return res.status(401).json({ error: 'Invalid token format' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token format' })
+      }
     }
 
     const userId = token.replace('demo-token-', '')
@@ -49,312 +63,328 @@ export default async function handler(req, res) {
       .single()
 
     if (userError || !currentUser) {
-      return res.status(401).json({ error: 'Invalid token - user not found' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token - user not found' })
+      }
+    }
+
+    // Check if user has HR permissions
+    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Only HR staff can manage templates' })
+      }
     }
 
     if (!currentUser.company_id) {
-      return res.status(400).json({ error: 'User has no company assigned' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'User has no company assigned' })
+      }
     }
 
-    // Handle different HTTP methods
-    switch (req.method) {
-      case 'GET':
-        return await handleGetDocuments(req, res, supabase, currentUser)
-      case 'POST':
-        return await handleGenerateDocument(req, res, supabase, currentUser)
-      case 'PUT':
-        return await handleUpdateDocument(req, res, supabase, currentUser)
-      case 'DELETE':
-        return await handleDeleteDocument(req, res, supabase, currentUser)
-      default:
-        return res.status(405).json({ error: 'Method not allowed' })
+    // Parse the path to determine the endpoint
+    const path = event.path.replace('/.netlify/functions/documents', '')
+    
+    // Handle different HTTP methods for templates
+    if (path.includes('/templates')) {
+      switch (event.httpMethod) {
+        case 'GET':
+          return await handleGetTemplates(event, headers, supabase, currentUser)
+        case 'POST':
+          return await handleCreateTemplate(event, headers, supabase, currentUser)
+        case 'PUT':
+          return await handleUpdateTemplate(event, headers, supabase, currentUser)
+        case 'DELETE':
+          return await handleDeleteTemplate(event, headers, supabase, currentUser)
+        default:
+          return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' })
+          }
+      }
+    }
+
+    // Handle document generation
+    if (path.includes('/generate')) {
+      if (event.httpMethod === 'POST') {
+        return await handleGenerateDocument(event, headers, supabase, currentUser)
+      }
+      return {
+        statusCode: 405,
+        headers,
+        body: JSON.stringify({ error: 'Method not allowed' })
+      }
+    }
+
+    return {
+      statusCode: 404,
+      headers,
+      body: JSON.stringify({ error: 'Endpoint not found' })
     }
 
   } catch (error) {
     console.error('Document API error:', error)
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message
-    })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message
+      })
+    }
   }
 }
 
-// Get all generated documents for the company
-async function handleGetDocuments(req, res, supabase, currentUser) {
+// Get all templates for the company
+async function handleGetTemplates(event, headers, supabase, currentUser) {
   try {
-    const { employee_id, template_id, status } = req.query
-    
-    let query = supabase
-      .from('generated_documents')
-      .select(`
-        *,
-        document_templates!inner(document_name, template_type),
-        users!inner(full_name, email)
-      `)
+    const { data: templates, error } = await supabase
+      .from('document_templates')
+      .select('*')
       .eq('company_id', currentUser.company_id)
-
-    // Apply filters
-    if (employee_id) {
-      query = query.eq('employee_id', employee_id)
-    }
-    if (template_id) {
-      query = query.eq('template_id', template_id)
-    }
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    // If user is not HR, only show their own documents
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      query = query.eq('employee_id', currentUser.id)
-    }
-
-    const { data: documents, error } = await query
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to fetch templates' })
+      }
     }
 
-    res.status(200).json({
-      success: true,
-      documents: documents || [],
-      total: documents?.length || 0,
-      company_id: currentUser.company_id
-    })
-
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(templates)
+    }
   } catch (error) {
-    console.error('Get documents error:', error)
-    return res.status(500).json({ error: 'Failed to fetch documents' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
 
-// Generate document from template
-async function handleGenerateDocument(req, res, supabase, currentUser) {
+// Create a new template
+async function handleCreateTemplate(event, headers, supabase, currentUser) {
   try {
-    const {
-      template_id,
-      employee_id,
-      field_values,
-      document_title,
-      notes,
-      status = 'draft'
-    } = req.body
+    const { document_name, field_tags, content, settings } = JSON.parse(event.body)
 
-    if (!template_id || !employee_id || !field_values) {
-      return res.status(400).json({ 
-        error: 'Template ID, employee ID, and field values are required' 
-      })
+    // Validation
+    if (!document_name || !field_tags || !content) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
+      }
     }
 
-    // Check if template exists and belongs to the company
+    const { data: template, error } = await supabase
+      .from('document_templates')
+      .insert([{
+        document_name,
+        field_tags,
+        content,
+        settings: settings || {},
+        company_id: currentUser.company_id,
+        created_by: currentUser.id
+      }])
+      .select()
+      .single()
+
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to create template' })
+      }
+    }
+
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify(template)
+    }
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
+  }
+}
+
+// Update a template
+async function handleUpdateTemplate(event, headers, supabase, currentUser) {
+  try {
+    const templateId = event.path.split('/').pop()
+    const { document_name, field_tags, content, settings } = JSON.parse(event.body)
+
+    // Validation
+    if (!document_name || !field_tags || !content) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
+      }
+    }
+
+    const { data: template, error } = await supabase
+      .from('document_templates')
+      .update({
+        document_name,
+        field_tags,
+        content,
+        settings: settings || {},
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', templateId)
+      .eq('company_id', currentUser.company_id)
+      .select()
+      .single()
+
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to update template' })
+      }
+    }
+
+    if (!template) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Template not found' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(template)
+    }
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
+  }
+}
+
+// Delete a template
+async function handleDeleteTemplate(event, headers, supabase, currentUser) {
+  try {
+    const templateId = event.path.split('/').pop()
+
+    const { error } = await supabase
+      .from('document_templates')
+      .delete()
+      .eq('id', templateId)
+      .eq('company_id', currentUser.company_id)
+
+    if (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to delete template' })
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ message: 'Template deleted successfully' })
+    }
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
+  }
+}
+
+// Generate a document from template
+async function handleGenerateDocument(event, headers, supabase, currentUser) {
+  try {
+    const { template_id, field_values } = JSON.parse(event.body)
+
+    // Validation
+    if (!template_id || !field_values) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
+      }
+    }
+
+    // Get the template
     const { data: template, error: templateError } = await supabase
       .from('document_templates')
       .select('*')
       .eq('id', template_id)
       .eq('company_id', currentUser.company_id)
-      .eq('is_active', true)
       .single()
 
     if (templateError || !template) {
-      return res.status(404).json({ error: 'Template not found or inactive' })
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Template not found' })
+      }
     }
 
-    // Check if employee exists and belongs to the company
-    const { data: employee, error: employeeError } = await supabase
-      .from('users')
-      .select('id, full_name, email')
-      .eq('id', employee_id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (employeeError || !employee) {
-      return res.status(404).json({ error: 'Employee not found' })
-    }
-
-    // Generate document content by replacing field tags
+    // Generate document content by replacing placeholders
     let generatedContent = template.content
-    if (field_values && typeof field_values === 'object') {
-      Object.keys(field_values).forEach(field => {
-        const regex = new RegExp(`{{${field}}}`, 'g')
-        generatedContent = generatedContent.replace(regex, field_values[field] || '')
-      })
-    }
+    Object.keys(field_values).forEach(key => {
+      const placeholder = `{{${key}}}`
+      generatedContent = generatedContent.replace(new RegExp(placeholder, 'g'), field_values[key] || `[${key}]`)
+    })
 
-    // Generate UUID for new document
-    const { randomUUID } = require('crypto')
-    const documentId = randomUUID()
-
-    // Create generated document record
-    const { data: newDocument, error: createError } = await supabase
+    // Save the generated document
+    const { data: document, error: docError } = await supabase
       .from('generated_documents')
       .insert([{
-        id: documentId,
         template_id,
-        employee_id,
-        company_id: currentUser.company_id,
-        document_title: document_title || template.document_name,
-        original_content: template.content,
-        generated_content: generatedContent,
+        content: generatedContent,
         field_values,
-        status,
-        notes: notes || '',
-        generated_by: currentUser.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        company_id: currentUser.company_id,
+        generated_by: currentUser.id
       }])
       .select()
       .single()
 
-    if (createError) {
-      console.error('Document generation error:', createError)
-      return res.status(500).json({ 
-        error: 'Failed to generate document',
-        message: createError.message 
-      })
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Document generated successfully',
-      document: {
-        ...newDocument,
-        template_name: template.document_name,
-        employee_name: employee.full_name
+    if (docError) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Failed to save generated document' })
       }
-    })
-
-  } catch (error) {
-    console.error('Generate document error:', error)
-    return res.status(500).json({ error: 'Failed to generate document' })
-  }
-}
-
-// Update document status or content
-async function handleUpdateDocument(req, res, supabase, currentUser) {
-  try {
-    const { id } = req.query
-    if (!id) {
-      return res.status(400).json({ error: 'Document ID is required' })
     }
 
-    const {
-      status,
-      notes,
-      field_values,
-      generated_content
-    } = req.body
-
-    // Check if document exists and belongs to the company
-    const { data: existingDocument, error: fetchError } = await supabase
-      .from('generated_documents')
-      .select('*')
-      .eq('id', id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingDocument) {
-      return res.status(404).json({ error: 'Document not found' })
-    }
-
-    // Check permissions - only HR can update status, employees can only update their own documents
-    if (status && !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can update document status' })
-    }
-
-    if (existingDocument.employee_id !== currentUser.id && 
-        !['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'You can only update your own documents' })
-    }
-
-    // Update document
-    const updateData = {
-      updated_at: new Date().toISOString()
-    }
-
-    if (status !== undefined) updateData.status = status
-    if (notes !== undefined) updateData.notes = notes
-    if (field_values !== undefined) updateData.field_values = field_values
-    if (generated_content !== undefined) updateData.generated_content = generated_content
-
-    const { data: updatedDocument, error: updateError } = await supabase
-      .from('generated_documents')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (updateError) {
-      console.error('Document update error:', updateError)
-      return res.status(500).json({ 
-        error: 'Failed to update document',
-        message: updateError.message 
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Document generated successfully',
+        document: document,
+        content: generatedContent
       })
     }
-
-    res.status(200).json({
-      success: true,
-      message: 'Document updated successfully',
-      document: updatedDocument
-    })
-
   } catch (error) {
-    console.error('Update document error:', error)
-    return res.status(500).json({ error: 'Failed to update document' })
-  }
-}
-
-// Delete document
-async function handleDeleteDocument(req, res, supabase, currentUser) {
-  try {
-    const { id } = req.query
-    if (!id) {
-      return res.status(400).json({ error: 'Document ID is required' })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' })
     }
-
-    // Check if document exists and belongs to the company
-    const { data: existingDocument, error: fetchError } = await supabase
-      .from('generated_documents')
-      .select('*')
-      .eq('id', id)
-      .eq('company_id', currentUser.company_id)
-      .single()
-
-    if (fetchError || !existingDocument) {
-      return res.status(404).json({ error: 'Document not found' })
-    }
-
-    // Check permissions - only HR can delete documents
-    if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only HR staff can delete documents' })
-    }
-
-    // Delete document
-    const { error: deleteError } = await supabase
-      .from('generated_documents')
-      .delete()
-      .eq('id', id)
-
-    if (deleteError) {
-      console.error('Document deletion error:', deleteError)
-      return res.status(500).json({ 
-        error: 'Failed to delete document',
-        message: deleteError.message 
-      })
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Document deleted successfully',
-      deleted_document: {
-        id: existingDocument.id,
-        title: existingDocument.document_title
-      }
-    })
-
-  } catch (error) {
-    console.error('Delete document error:', error)
-    return res.status(500).json({ error: 'Failed to delete document' })
   }
 }

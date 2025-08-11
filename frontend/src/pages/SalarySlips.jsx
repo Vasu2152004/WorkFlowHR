@@ -56,7 +56,7 @@ export default function SalarySlips() {
       }
 
       // Fetch employees
-      const employeesResponse = await fetch(`${API_BASE_URL}/users/employees`, {
+              const employeesResponse = await fetch(`${API_BASE_URL}/employees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

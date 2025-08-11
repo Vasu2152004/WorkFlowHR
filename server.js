@@ -157,13 +157,17 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' })
 })
 
-// Only start the server if we're not in a serverless environment
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`🚀 WorkFlowHR server running on port ${PORT} in ${NODE_ENV} mode`)
-    console.log(`📊 Health check available at: http://localhost:${PORT}/health`)
-    console.log(`🔗 API base URL: http://localhost:${PORT}/api`)
-  })
-}
+// Start the server for all environments
+app.listen(PORT, () => {
+  console.log(`🚀 WorkFlowHR server running on port ${PORT} in ${NODE_ENV} mode`)
+  console.log(`📊 Health check available at: http://localhost:${PORT}/health`)
+  console.log(`🔗 API base URL: http://localhost:${PORT}/api`)
+})
 
-module.exports = app 
+module.exports = app
+
+// Vercel serverless function handler
+module.exports.handler = (req, res) => {
+  // This ensures compatibility with Vercel's serverless environment
+  return app(req, res)
+} 

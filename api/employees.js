@@ -1,20 +1,30 @@
 const { createClient } = require('@supabase/supabase-js')
 const nodemailer = require('nodemailer')
 
-export default async function handler(req, res) {
+// Netlify serverless function handler
+exports.handler = async (event, context) => {
   // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
+  const headers = {
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
+    'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
   }
 
-  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'DELETE') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    }
+  }
+
+  if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST' && event.httpMethod !== 'DELETE') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    }
   }
 
   try {
@@ -22,15 +32,23 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ error: 'Database configuration missing' })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Database configuration missing' })
+      }
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get Authorization header
-    const authHeader = req.headers.authorization
+    const authHeader = event.headers.authorization
     if (!authHeader) {
-      return res.status(401).json({ error: 'Authorization header missing' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Authorization header missing' })
+      }
     }
 
     const token = authHeader.replace('Bearer ', '')
@@ -38,7 +56,11 @@ export default async function handler(req, res) {
 
     // Extract user ID from token (format: 'demo-token-{user_id}')
     if (!token.startsWith('demo-token-')) {
-      return res.status(401).json({ error: 'Invalid token format' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token format' })
+      }
     }
 
     const userId = token.replace('demo-token-', '')
@@ -53,24 +75,32 @@ export default async function handler(req, res) {
 
     if (userError || !currentUser) {
       console.error('User lookup error:', userError)
-      return res.status(401).json({ error: 'Invalid token - user not found' })
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid token - user not found' })
+      }
     }
 
     if (!currentUser.company_id) {
-      return res.status(400).json({ error: 'User has no company assigned' })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'User has no company assigned' })
+      }
     }
 
     console.log('Current user company:', currentUser.company_id)
     const userCompanyId = currentUser.company_id
 
     // Handle POST request (Add Employee)
-    if (req.method === 'POST') {
-      return await handleAddEmployee(req, res, supabase, currentUser)
+    if (event.httpMethod === 'POST') {
+      return await handleAddEmployee(event, headers, supabase, currentUser)
     }
 
     // Handle DELETE request (Delete Employee)
-    if (req.method === 'DELETE') {
-      return await handleDeleteEmployee(req, res, supabase, currentUser)
+    if (event.httpMethod === 'DELETE') {
+      return await handleDeleteEmployee(event, headers, supabase, currentUser)
     }
 
     // Fetch employees from the main company (using only existing columns)
@@ -90,7 +120,11 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('Database error:', error)
-      return res.status(500).json({ error: error.message })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: error.message })
+      }
     }
 
     console.log(`Found ${employees.length} employees for company ${userCompanyId} (user: ${currentUser.email})`)
@@ -113,40 +147,54 @@ export default async function handler(req, res) {
       created_at: emp.created_at
     }))
 
-    res.status(200).json({
-      success: true,
-      employees: transformedEmployees,
-      total: transformedEmployees.length,
-      company_id: userCompanyId,
-      current_user: {
-        id: currentUser.id,
-        email: currentUser.email,
-        role: currentUser.role
-      },
-      message: 'Employees fetched successfully'
-    })
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        employees: transformedEmployees,
+        total: transformedEmployees.length,
+        company_id: userCompanyId,
+        current_user: {
+          id: currentUser.id,
+          email: currentUser.email,
+          role: currentUser.role
+        },
+        message: 'Employees fetched successfully'
+      })
+    }
 
   } catch (error) {
     console.error('Employees fetch error:', error)
-    res.status(500).json({ 
-      error: 'Failed to fetch employees',
-      message: error.message
-    })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to fetch employees',
+        message: error.message
+      })
+    }
   }
 }
 
 // Handle Add Employee functionality
-async function handleAddEmployee(req, res, supabase, currentUser) {
+async function handleAddEmployee(event, headers, supabase, currentUser) {
   try {
     // Check if user has permission to add employees
     if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ error: 'Only Admin, HR Manager, and HR can create employees' })
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Only Admin, HR Manager, and HR can create employees' })
+      }
     }
 
     // Get employee data from request
     const {
       full_name,
       email,
+      department,
+      designation,
       salary,
       joining_date,
       phone_number,
@@ -154,16 +202,18 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
       emergency_contact,
       pan_number,
       bank_account,
-      leave_balance
-    } = req.body
+      leave_balance = 20
+    } = JSON.parse(event.body)
 
-    if (!full_name || !email || !salary) {
-      return res.status(400).json({ error: 'Required fields missing: full_name, email, salary' })
+    if (!full_name || !email || !department || !designation || !salary || !joining_date) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Required fields missing: full_name, email, department, designation, salary, joining_date' 
+        })
+      }
     }
-
-    // Set defaults for missing database columns
-    const department = req.body.department || 'Not Assigned'
-    const designation = req.body.designation || 'Employee'
 
     // Check if email already exists
     const { data: existingUser } = await supabase
@@ -173,7 +223,11 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
       .single()
 
     if (existingUser) {
-      return res.status(409).json({ error: 'User with this email already exists' })
+      return {
+        statusCode: 409,
+        headers,
+        body: JSON.stringify({ error: 'User with this email already exists' })
+      }
     }
 
     // Generate employee ID and password
@@ -201,14 +255,16 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
       role = 'hr_manager'
     } else if (designation.toLowerCase().includes('hr') || designation.toLowerCase().includes('human resources')) {
       role = 'hr'
+    } else if (designation.toLowerCase().includes('team lead') || designation.toLowerCase().includes('team-lead')) {
+      role = 'team_lead'
     }
 
     // Generate UUID for new employee
     const { randomUUID } = require('crypto')
     const newEmployeeId = randomUUID()
 
-    // Create new employee
-    const { data: newEmployee, error: createError } = await supabase
+    // Start transaction - create user first
+    const { data: newUser, error: createUserError } = await supabase
       .from('users')
       .insert([
         {
@@ -217,7 +273,7 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
           password: generatedPassword,
           full_name: full_name,
           role: role,
-          company_id: currentUser.company_id, // Same company as creator
+          company_id: currentUser.company_id,
           created_by: currentUser.id,
           is_active: true,
           created_at: new Date().toISOString(),
@@ -227,16 +283,66 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
       .select()
       .single()
 
-    if (createError) {
-      console.error('Employee creation error:', createError)
-      return res.status(500).json({ 
-        error: 'Failed to create employee',
-        message: createError.message 
-      })
+    if (createUserError) {
+      console.error('User creation error:', createUserError)
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Failed to create user',
+          message: createUserError.message 
+        })
+      }
+    }
+
+    // Now create the employee record with all details
+    const { data: newEmployee, error: createEmployeeError } = await supabase
+      .from('employees')
+      .insert([
+        {
+          user_id: newEmployeeId,
+          employee_id: employeeId,
+          full_name: full_name,
+          email: email.toLowerCase(),
+          department: department,
+          designation: designation,
+          salary: parseFloat(salary),
+          joining_date: joining_date,
+          phone_number: phone_number || null,
+          address: address || null,
+          emergency_contact: emergency_contact || null,
+          pan_number: pan_number || null,
+          bank_account: bank_account || null,
+          leave_balance: parseInt(leave_balance),
+          created_by: currentUser.id,
+          company_id: currentUser.company_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ])
+      .select()
+      .single()
+
+    if (createEmployeeError) {
+      console.error('Employee record creation error:', createEmployeeError)
+      // If employee creation fails, delete the user we just created
+      await supabase
+        .from('users')
+        .delete()
+        .eq('id', newEmployeeId)
+      
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Failed to create employee record',
+          message: createEmployeeError.message 
+        })
+      }
     }
 
     // Remove password from response for security
-    const { password: _, ...employeeWithoutPassword } = newEmployee
+    const { password: _, ...userWithoutPassword } = newUser
 
     // Send welcome email with credentials (inline implementation)
     let emailSent = false
@@ -245,7 +351,7 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
       const emailPass = process.env.EMAIL_PASS
       
       if (emailUser && emailPass) {
-        const transporter = nodemailer.createTransport({
+        const transporter = nodemailer.createTransporter({
           service: 'gmail',
           auth: {
             user: emailUser,
@@ -282,6 +388,14 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Designation:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${designation}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Salary:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">₹${parseFloat(salary).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Joining Date:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${new Date(joining_date).toLocaleDateString()}</td>
                 </tr>
               </table>
             </div>
@@ -330,44 +444,70 @@ async function handleAddEmployee(req, res, supabase, currentUser) {
       console.error('❌ Failed to send welcome email:', emailError)
     }
 
-    return res.status(201).json({
-      message: 'Employee created successfully',
-      employee: {
-        ...employeeWithoutPassword,
-        employee_id: employeeId,
-        password: generatedPassword // Include in response for now
-      },
-      email_sent: emailSent,
-      email_status: emailSent 
-        ? 'Welcome email sent successfully' 
-        : 'Email not configured - please share credentials manually'
-    })
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify({
+        message: 'Employee created successfully',
+        employee: {
+          ...userWithoutPassword,
+          employee_id: employeeId,
+          department: department,
+          designation: designation,
+          salary: parseFloat(salary),
+          joining_date: joining_date,
+          phone_number: phone_number || null,
+          address: address || null,
+          emergency_contact: emergency_contact || null,
+          pan_number: pan_number || null,
+          bank_account: bank_account || null,
+          leave_balance: parseInt(leave_balance),
+          password: generatedPassword // Include in response for HR reference
+        },
+        email_sent: emailSent,
+        email_status: emailSent 
+          ? 'Welcome email sent successfully' 
+          : 'Email not configured - please share credentials manually'
+      })
+    }
 
   } catch (error) {
     console.error('Add employee error:', error)
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message 
+      })
+    }
   }
 }
 
 // Handle DELETE employee request
-async function handleDeleteEmployee(req, res, supabase, currentUser) {
+async function handleDeleteEmployee(event, headers, supabase, currentUser) {
   try {
     // Check permissions - only admin, hr_manager, and hr can delete employees
     if (!['admin', 'hr_manager', 'hr'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        error: 'Permission denied. Only Admin, HR Manager, and HR can delete employees.' 
-      })
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Permission denied. Only Admin, HR Manager, and HR can delete employees.' 
+        })
+      }
     }
 
     // Get employee ID from query parameters
-    const { employee_id } = req.query
+    const { employee_id } = JSON.parse(event.body || '{}')
     if (!employee_id) {
-      return res.status(400).json({ 
-        error: 'Employee ID is required for deletion' 
-      })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Employee ID is required for deletion' 
+        })
+      }
     }
 
     console.log('Attempting to delete employee:', employee_id)
@@ -380,23 +520,35 @@ async function handleDeleteEmployee(req, res, supabase, currentUser) {
       .single()
 
     if (fetchError || !employeeToDelete) {
-      return res.status(404).json({ 
-        error: 'Employee not found' 
-      })
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Employee not found' 
+        })
+      }
     }
 
     // Check if the employee belongs to the same company (company isolation)
     if (employeeToDelete.company_id !== currentUser.company_id) {
-      return res.status(403).json({ 
-        error: 'Permission denied. You can only delete employees from your company.' 
-      })
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Permission denied. You can only delete employees from your company.' 
+        })
+      }
     }
 
     // Prevent deleting yourself
     if (employeeToDelete.id === currentUser.id) {
-      return res.status(400).json({ 
-        error: 'You cannot delete your own account' 
-      })
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'You cannot delete your own account' 
+        })
+      }
     }
 
     // Delete the employee
@@ -407,29 +559,41 @@ async function handleDeleteEmployee(req, res, supabase, currentUser) {
 
     if (deleteError) {
       console.error('Delete employee error:', deleteError)
-      return res.status(500).json({ 
-        error: 'Failed to delete employee', 
-        details: deleteError.message 
-      })
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Failed to delete employee', 
+          details: deleteError.message 
+        })
+      }
     }
 
     console.log('✅ Employee deleted successfully:', employeeToDelete.full_name)
 
-    return res.status(200).json({
-      message: 'Employee deleted successfully',
-      deleted_employee: {
-        id: employeeToDelete.id,
-        name: employeeToDelete.full_name,
-        email: employeeToDelete.email,
-        role: employeeToDelete.role
-      }
-    })
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        message: 'Employee deleted successfully',
+        deleted_employee: {
+          id: employeeToDelete.id,
+          name: employeeToDelete.full_name,
+          email: employeeToDelete.email,
+          role: employeeToDelete.role
+        }
+      })
+    }
 
   } catch (error) {
     console.error('Delete employee error:', error)
-    return res.status(500).json({ 
-      error: 'Failed to delete employee', 
-      details: error.message 
-    })
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to delete employee', 
+        details: error.message 
+      })
+    }
   }
 }

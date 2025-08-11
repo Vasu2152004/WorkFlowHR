@@ -26,7 +26,7 @@ const LeaveManagement = () => {
   const fetchLeaveRequests = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      let url = 'http://localhost:3000/api/leaves/requests'
+      let url = `${API_BASE_URL}/leaves/requests`
       const params = new URLSearchParams()
       
       if (filterStatus) params.append('status', filterStatus)
@@ -54,7 +54,7 @@ const LeaveManagement = () => {
   const fetchEmployees = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/users/employees', {
+              const response = await fetch(`${API_BASE_URL}/employees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -74,7 +74,7 @@ const LeaveManagement = () => {
   const fetchLeaveTypes = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3000/api/leaves/types', {
+              const response = await fetch(`${API_BASE_URL}/leaves/types`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -106,7 +106,7 @@ const LeaveManagement = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`http://localhost:3000/api/leaves/requests/${requestId}`, {
+              const response = await fetch(`${API_BASE_URL}/leaves/requests/${requestId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

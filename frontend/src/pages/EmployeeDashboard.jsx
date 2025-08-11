@@ -55,7 +55,7 @@ const EmployeeDashboard = () => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/users/employees`, {
+              const response = await fetch(`${API_BASE_URL}/employees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

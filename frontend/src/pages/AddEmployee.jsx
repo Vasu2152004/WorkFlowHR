@@ -192,7 +192,7 @@ export default function AddEmployee() {
       }
 
       // Send to backend API
-      const response = await fetch(`${API_BASE_URL}/users/employees`, {
+      const response = await fetch(`${API_BASE_URL}/employees`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
